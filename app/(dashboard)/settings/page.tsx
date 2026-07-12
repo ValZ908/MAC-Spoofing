@@ -21,8 +21,8 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-white">Router Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Router Settings</h1>
+        <p className="mt-1 text-sm text-gray-400">
           Credentials detector.py uses to SSH into your router and block confirmed attackers
           automatically.
         </p>
@@ -35,7 +35,7 @@ export default async function SettingsPage() {
           <div
             className={`flex items-center gap-3 rounded-2xl border p-5 ${
               isConfigured
-                ? "border-white/15 bg-white/5"
+                ? "border-white/15 bg-white/10"
                 : "border-amber-500/30 bg-amber-500/10"
             }`}
           >
@@ -48,7 +48,7 @@ export default async function SettingsPage() {
               <p className="text-sm font-semibold text-white">
                 {isConfigured ? "Auto-block is active" : "Auto-block not configured yet"}
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">
+              <p className="mt-0.5 text-xs text-gray-400">
                 {isConfigured
                   ? "detector.py will SSH into your router and block confirmed attackers automatically."
                   : "Fill in your router IP so detector.py can block confirmed attackers automatically."}
@@ -56,8 +56,8 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/5 bg-zinc-950 p-5">
-            <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <div className="rounded-2xl border border-white/10 bg-zinc-900 p-5">
+            <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
               <Router className="h-3.5 w-3.5" />
               Router
             </p>
@@ -66,8 +66,8 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/5 bg-zinc-950 p-5">
-            <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <div className="rounded-2xl border border-white/10 bg-zinc-900 p-5">
+            <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
               <Timer className="h-3.5 w-3.5" />
               Sensitivity
             </p>
@@ -78,14 +78,14 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/5 bg-zinc-950 p-5">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <div className="rounded-2xl border border-white/10 bg-zinc-900 p-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
               Command preview
             </p>
             <p className="rounded-lg bg-black/40 px-3 py-2 font-mono text-xs text-gray-300">
               {previewCommand || "No command configured"}
             </p>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-400">
               Example with a placeholder MAC — this is exactly what runs over SSH when an
               attacker gets blocked.
             </p>

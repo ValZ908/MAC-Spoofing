@@ -46,8 +46,8 @@ function StatCard({
         : "text-white";
 
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-white/5 bg-zinc-950 p-4 sm:p-6">
-      <div className="mb-4 flex items-center gap-2 text-gray-500 sm:mb-6">
+    <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4 sm:p-6">
+      <div className="mb-4 flex items-center gap-2 text-gray-400 sm:mb-6">
         <Icon className="h-4 w-4" />
         <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] sm:text-xs">{label}</h3>
       </div>
@@ -219,7 +219,7 @@ export function DashboardClient({
                 ? "text-red-400"
                 : bannerState === "warning"
                   ? "text-amber-400"
-                  : "text-gray-500"
+                  : "text-gray-400"
             }`}
           >
             {bannerState === "danger" &&
@@ -250,8 +250,8 @@ export function DashboardClient({
 
       {/* Widgets */}
       <div className="grid grid-cols-1 gap-4 sm:gap-8 lg:grid-cols-12">
-        <div className="flex flex-col rounded-2xl border border-white/5 bg-zinc-950 p-5 sm:rounded-[32px] sm:p-10 lg:col-span-7">
-          <div className="mb-6 flex items-center gap-3 text-gray-500 sm:mb-8">
+        <div className="flex flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:rounded-[32px] sm:p-10 lg:col-span-7">
+          <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
             <Bell className="h-5 w-5" />
             <h3 className="text-sm font-bold uppercase tracking-[0.15em]">Recent Alerts</h3>
           </div>
@@ -263,11 +263,11 @@ export function DashboardClient({
               {recentAlerts.map((alert) => (
                 <div
                   key={alert.id}
-                  className="flex flex-col gap-2 rounded-2xl border border-white/5 bg-zinc-900 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+                  className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-zinc-800 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
                 >
                   <div className="text-sm font-medium text-gray-300">
                     {new Date(alert.created_at).toLocaleString("en-US")}
-                    <span className="mx-3 text-gray-700">→</span>
+                    <span className="mx-3 text-gray-500">→</span>
                     {alert.target_ip}
                   </div>
                   <Badge variant={badgeVariant[alert.status]} className="w-fit">
@@ -279,13 +279,13 @@ export function DashboardClient({
           )}
         </div>
 
-        <div className="flex min-h-[260px] flex-col rounded-2xl border border-white/5 bg-zinc-950 p-5 sm:min-h-[300px] sm:rounded-[32px] sm:p-10 lg:col-span-5">
-          <div className="mb-6 flex items-center gap-3 text-gray-500 sm:mb-8">
+        <div className="flex min-h-[260px] flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:min-h-[300px] sm:rounded-[32px] sm:p-10 lg:col-span-5">
+          <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
             <ShieldCheck className="h-5 w-5" />
             <h3 className="text-sm font-bold uppercase tracking-[0.15em]">Device Trust</h3>
           </div>
 
-          <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/5 bg-zinc-900 p-4">
+          <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
             <span className="flex items-center gap-2 text-sm text-gray-400">
               <Radio className="h-4 w-4" />
               Detector Agent
@@ -322,15 +322,15 @@ export function DashboardClient({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-zinc-900 p-4">
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
                 <span className="text-sm text-gray-400">Unknown devices</span>
                 <span className="text-sm font-semibold text-white">
                   {unknownDeviceCount}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-zinc-900 p-4">
-                <span className="text-sm text-gray-300">Total alerts logged</span>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
+                <span className="text-sm text-gray-400">Total alerts logged</span>
                 <span className="text-sm font-semibold text-gray-300">{totalAlertCount}</span>
               </div>
             </div>

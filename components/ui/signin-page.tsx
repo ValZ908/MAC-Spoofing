@@ -9,7 +9,6 @@ type Blob = {
   top: number;
   delay: number;
   duration: number;
-  color: string;
 };
 
 // Fixed (non-random) layout so server and client render identically —
@@ -17,12 +16,12 @@ type Blob = {
 // Colors must be fully opaque: the gooey filter below clips any pixel
 // under ~47% alpha to fully transparent, so translucent fills disappear.
 const BLOBS: Blob[] = [
-  { size: 320, left: 5, top: 8, delay: 0, duration: 18, color: "bg-white" },
-  { size: 360, left: 62, top: 2, delay: -4, duration: 22, color: "bg-zinc-300" },
-  { size: 280, left: 28, top: 52, delay: -8, duration: 20, color: "bg-zinc-400" },
-  { size: 340, left: 74, top: 48, delay: -12, duration: 25, color: "bg-zinc-200" },
-  { size: 300, left: 0, top: 66, delay: -16, duration: 19, color: "bg-white" },
-  { size: 270, left: 46, top: 26, delay: -2, duration: 23, color: "bg-zinc-300" },
+  { size: 320, left: 5, top: 8, delay: 0, duration: 18 },
+  { size: 360, left: 62, top: 2, delay: -4, duration: 22 },
+  { size: 280, left: 28, top: 52, delay: -8, duration: 20 },
+  { size: 340, left: 74, top: 48, delay: -12, duration: 25 },
+  { size: 300, left: 0, top: 66, delay: -16, duration: 19 },
+  { size: 270, left: 46, top: 26, delay: -2, duration: 23 },
 ];
 
 interface SignInProps {
@@ -73,7 +72,7 @@ export function SignIn({ action, error }: SignInProps) {
             ref={(el) => {
               blobRefs.current[index] = el;
             }}
-            className={`animate-blob absolute rounded-full blur-2xl transition-[margin] duration-200 ease-out ${blob.color}`}
+            className="animate-blob absolute rounded-full bg-white blur-2xl transition-[margin] duration-200 ease-out"
             style={{
               width: blob.size,
               height: blob.size,
@@ -88,7 +87,7 @@ export function SignIn({ action, error }: SignInProps) {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-12 text-left">
-          <span className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.3em] text-white/60">
+          <span className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.3em] text-white">
             <ShieldCheck className="h-3.5 w-3.5" />
             Network Security Center
           </span>
@@ -101,46 +100,46 @@ export function SignIn({ action, error }: SignInProps) {
 
         <form action={action} className="space-y-7">
           {error && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-400">
               {error}
             </div>
           )}
 
           <div className="group relative">
-            <label htmlFor="email" className="mb-3 block text-[11px] uppercase tracking-widest text-white/40">
+            <label htmlFor="email" className="mb-3 block text-[11px] uppercase tracking-widest text-white/80">
               Email
             </label>
             <div className="relative">
-              <Mail className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <Mail className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
               <input
                 id="email"
                 name="email"
                 type="email"
                 placeholder="admin@example.com"
                 required
-                className="w-full border-b border-white/10 bg-transparent py-3 pl-7 text-lg text-white outline-none placeholder:text-white/20 focus:border-white/60"
+                className="w-full border-b-2 border-white/40 bg-transparent py-3 pl-7 text-lg text-white outline-none placeholder:text-white/40 focus:border-white"
               />
             </div>
           </div>
 
           <div className="group relative">
-            <label htmlFor="password" className="mb-3 block text-[11px] uppercase tracking-widest text-white/40">
+            <label htmlFor="password" className="mb-3 block text-[11px] uppercase tracking-widest text-white/80">
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <Lock className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
               <input
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 required
-                className="w-full border-b border-white/10 bg-transparent py-3 pl-7 pr-8 text-lg text-white outline-none placeholder:text-white/20 focus:border-white/60"
+                className="w-full border-b-2 border-white/40 bg-transparent py-3 pl-7 pr-8 text-lg text-white outline-none placeholder:text-white/40 focus:border-white"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70"
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -156,7 +155,7 @@ export function SignIn({ action, error }: SignInProps) {
           </button>
         </form>
 
-        <p className="mt-8 text-center text-xs text-white/30">
+        <p className="mt-8 text-center text-xs text-white/60">
           Access is provisioned by your network administrator.
         </p>
       </div>

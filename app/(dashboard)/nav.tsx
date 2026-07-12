@@ -110,7 +110,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar — fixed left, open by default, collapsible */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-20 hidden flex-col overflow-hidden border-white/10 bg-zinc-950 transition-all duration-300 ease-in-out md:flex",
+          "fixed inset-y-0 left-0 z-20 hidden flex-col overflow-hidden border-white/10 bg-zinc-900 transition-all duration-300 ease-in-out md:flex",
           desktopOpen ? "w-56 border-r" : "w-0 border-r-0"
         )}
       >
@@ -139,7 +139,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => setDesktopOpen(true)}
-          className="fixed left-4 top-4 z-30 hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950 text-muted-foreground transition-colors hover:text-white md:flex"
+          className="fixed left-4 top-4 z-30 hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-900 text-muted-foreground transition-colors hover:text-white md:flex"
           aria-label="Expand sidebar"
         >
           <PanelLeftOpen className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile top bar — closed by default, opens as a slide-in drawer */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-3 md:hidden">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-zinc-900 px-4 py-3 md:hidden">
         <Brand />
         <Sheet>
           <SheetTrigger asChild>
@@ -156,7 +156,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="flex w-[240px] flex-col border-white/10 bg-zinc-950">
+          <SheetContent side="left" className="flex w-[240px] flex-col border-white/10 bg-zinc-900">
             <div className="mt-8 flex flex-1 flex-col">
               <MobileNavLinks />
               <div className="mt-auto pt-4">

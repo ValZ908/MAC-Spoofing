@@ -33,13 +33,14 @@ function FormField({
         {label}
       </label>
       {children}
-      {hint && <p className="mt-1.5 text-xs text-gray-500">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
 
 const inputClassName =
-  "w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white outline-none transition placeholder:text-gray-600 focus:border-white/50 focus:ring-2 focus:ring-white/10";
+  "w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-white focus:ring-2 focus:ring-white/10";
+
 export function SettingsForm({ config }: { config: RouterConfig | null }) {
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
@@ -62,10 +63,10 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
   return (
     <form
       action={handleSubmit}
-      className="w-full rounded-2xl border border-white/5 bg-zinc-950 p-6 sm:p-8"
+      className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8"
     >
       <div className="flex flex-col gap-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Router Connection
         </p>
 
@@ -96,10 +97,10 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
         </FormField>
       </div>
 
-      <div className="my-6 border-t border-white/5" />
+      <div className="my-6 border-t border-white/10" />
 
       <div className="flex flex-col gap-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Detection Behavior
         </p>
 
@@ -133,7 +134,7 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
       <button
         type="submit"
         disabled={isPending}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-medium text-black transition hover:bg-zinc-200 disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-medium text-black transition-all hover:tracking-[0.15em] hover:bg-zinc-200 disabled:opacity-50"
       >
         <Save className="h-4 w-4" />
         Save Settings
