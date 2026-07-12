@@ -35,7 +35,7 @@ export function AlertRowActions({ alert }: { alert: Alert }) {
               await ignoreAlert(alert.id);
             })
           }
-          className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-md border border-white/15 px-3 py-1 text-xs font-medium text-gray-300 transition hover:bg-white/5 disabled:opacity-50"
         >
           <EyeOff className="h-3.5 w-3.5" />
           Ignore

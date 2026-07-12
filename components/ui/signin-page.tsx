@@ -1,208 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, ShieldCheck, LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Mail, Lock, ShieldCheck } from "lucide-react";
 
-interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-const Card = ({ children, className = "" }: CardProps) => (
-  <div className={`bg-card border border-border rounded-lg ${className}`}>
-    {children}
-  </div>
-);
-
-interface FormHeaderProps {
-  title: string;
-  subtitle: string;
-}
-
-const FormHeader = ({ title, subtitle }: FormHeaderProps) => (
-  <div className="space-y-2 text-center">
-    <h1 className="text-3xl font-bold tracking-tight text-foreground">
-      {title}
-    </h1>
-    <p className="text-muted-foreground">{subtitle}</p>
-  </div>
-);
-
-interface InputFieldProps {
-  id: string;
-  type: string;
-  label: string;
-  placeholder: string;
-  icon: LucideIcon;
-  required?: boolean;
-}
-
-const InputField = ({
-  id,
-  type,
-  label,
-  placeholder,
-  icon: Icon,
-  required = false,
-}: InputFieldProps) => (
-  <div className="space-y-2">
-    <label htmlFor={id} className="text-sm font-medium text-foreground">
-      {label}
-    </label>
-    <div className="relative">
-      <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        id={id}
-        name={id}
-        type={type}
-        placeholder={placeholder}
-        required={required}
-        className="h-11 w-full rounded-md border border-input bg-background pl-10 pr-3 text-foreground placeholder:text-muted-foreground transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-slate-400/40 focus:ring-offset-2 focus:ring-offset-background"
-      />
-    </div>
-  </div>
-);
-
-interface PasswordFieldProps {
-  id: string;
-  label: string;
-  placeholder: string;
-  showPassword: boolean;
-  onTogglePassword: () => void;
-  required?: boolean;
-}
-
-const PasswordField = ({
-  id,
-  label,
-  placeholder,
-  showPassword,
-  onTogglePassword,
-  required = false,
-}: PasswordFieldProps) => (
-  <div className="space-y-2">
-    <label htmlFor={id} className="text-sm font-medium text-foreground">
-      {label}
-    </label>
-    <div className="relative">
-      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        id={id}
-        name={id}
-        type={showPassword ? "text" : "password"}
-        placeholder={placeholder}
-        required={required}
-        className="h-11 w-full rounded-md border border-input bg-background pl-10 pr-10 text-foreground placeholder:text-muted-foreground transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-slate-400/40 focus:ring-offset-2 focus:ring-offset-background"
-      />
-      <button
-        type="button"
-        onClick={onTogglePassword}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors duration-300 hover:text-foreground"
-        aria-label={showPassword ? "Hide password" : "Show password"}
-      >
-        {showPassword ? (
-          <EyeOff className="h-4 w-4" />
-        ) : (
-          <Eye className="h-4 w-4" />
-        )}
-      </button>
-    </div>
-  </div>
-);
-
-interface ButtonProps {
-  type?: "button" | "submit" | "reset";
-  children: React.ReactNode;
-}
-
-const Button = ({ type = "button", children }: ButtonProps) => (
-  <button
-    type={type}
-    className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-slate-200 to-white font-medium text-slate-900 shadow-lg transition-all duration-300 hover:from-white hover:to-white focus:outline-none focus:ring-2 focus:ring-slate-400/40 focus:ring-offset-2 focus:ring-offset-background"
-  >
-    {children}
-  </button>
-);
-
-interface AnimatedBlobProps {
+type Blob = {
+  size: number;
+  left: number;
+  top: number;
+  delay: number;
+  duration: number;
   color: string;
-  position: string;
-  delayClassName?: string;
-}
+};
 
-const AnimatedBlob = ({
-  color,
-  position,
-  delayClassName = "",
-}: AnimatedBlobProps) => (
-  <div
-    className={`absolute ${position} h-72 w-72 ${color} animate-blob rounded-full opacity-70 mix-blend-screen blur-xl ${delayClassName}`}
-  />
-);
-
-const GradientWave = () => (
-  <div className="absolute inset-0 opacity-20">
-    <svg
-      className="absolute inset-0 h-full w-full"
-      preserveAspectRatio="none"
-      viewBox="0 0 1440 560"
-    >
-      <defs>
-        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#e2e8f0" stopOpacity="0.1" />
-        </linearGradient>
-      </defs>
-      <path
-        fill="url(#gradient1)"
-        d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,218.7C672,235,768,245,864,234.7C960,224,1056,192,1152,186.7C1248,181,1344,203,1392,213.3L1440,224L1440,560L1392,560C1344,560,1248,560,1152,560C1056,560,960,560,864,560C768,560,672,560,576,560C480,560,384,560,288,560C192,560,96,560,48,560L0,560Z"
-      />
-    </svg>
-  </div>
-);
-
-const IconBadge = ({ icon }: { icon: React.ReactNode }) => (
-  <div className="mb-4 inline-flex rounded-full bg-white/10 p-3 text-white backdrop-blur-sm">
-    {icon}
-  </div>
-);
-
-interface HeroSectionProps {
-  title: string;
-  description: string;
-  icon?: React.ReactNode;
-}
-
-const HeroSection = ({ title, description, icon }: HeroSectionProps) => (
-  <div className="max-w-md space-y-6 text-center">
-    {icon && <IconBadge icon={icon} />}
-    <h2 className="text-3xl font-bold text-white lg:text-4xl">{title}</h2>
-    <p className="text-lg text-white/80">{description}</p>
-  </div>
-);
-
-const GradientBackground = ({ children }: { children: React.ReactNode }) => (
-  <div className="relative hidden flex-1 overflow-hidden lg:flex">
-    <div className="absolute inset-0 bg-gradient-to-br from-black via-slate-900 to-black" />
-    <div className="absolute inset-0">
-      <AnimatedBlob color="bg-slate-400/30" position="-left-4 top-0" />
-      <AnimatedBlob
-        color="bg-zinc-500/30"
-        position="-right-4 top-0"
-        delayClassName="[animation-delay:4s]"
-      />
-      <AnimatedBlob
-        color="bg-gray-300/20"
-        position="-bottom-8 left-20"
-        delayClassName="[animation-delay:8s]"
-      />
-    </div>
-    <GradientWave />
-    <div className="relative z-10 flex w-full items-center justify-center p-8 lg:p-12">
-      {children}
-    </div>
-  </div>
-);
+// Fixed (non-random) layout so server and client render identically —
+// Math.random() here would cause a hydration mismatch.
+// Colors must be fully opaque: the gooey filter below clips any pixel
+// under ~47% alpha to fully transparent, so translucent fills disappear.
+const BLOBS: Blob[] = [
+  { size: 320, left: 5, top: 8, delay: 0, duration: 18, color: "bg-white" },
+  { size: 360, left: 62, top: 2, delay: -4, duration: 22, color: "bg-zinc-300" },
+  { size: 280, left: 28, top: 52, delay: -8, duration: 20, color: "bg-zinc-400" },
+  { size: 340, left: 74, top: 48, delay: -12, duration: 25, color: "bg-zinc-200" },
+  { size: 300, left: 0, top: 66, delay: -16, duration: 19, color: "bg-white" },
+  { size: 270, left: 46, top: 26, delay: -2, duration: 23, color: "bg-zinc-300" },
+];
 
 interface SignInProps {
   action: (formData: FormData) => void | Promise<void>;
@@ -211,55 +32,134 @@ interface SignInProps {
 
 export function SignIn({ action, error }: SignInProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const blobRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = e.clientX / window.innerWidth;
+      const y = e.clientY / window.innerHeight;
+      blobRefs.current.forEach((blob, index) => {
+        if (!blob) return;
+        const speed = (index + 1) * 14;
+        blob.style.marginLeft = `${x * speed}px`;
+        blob.style.marginTop = `${y * speed}px`;
+      });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row">
-      <div className="flex flex-1 items-center justify-center bg-background p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-md space-y-8">
-          <FormHeader
-            title="Welcome back"
-            subtitle="Sign in to monitor your network"
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black px-4 text-white">
+      <svg className="absolute h-0 w-0">
+        <defs>
+          <filter id="login-gooey">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+            <feColorMatrix
+              in="blur"
+              mode="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9"
+              result="goo"
+            />
+            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+          </filter>
+        </defs>
+      </svg>
+
+      <div className="pointer-events-none absolute inset-0 opacity-35" style={{ filter: "url(#login-gooey)" }}>
+        {BLOBS.map((blob, index) => (
+          <div
+            key={index}
+            ref={(el) => {
+              blobRefs.current[index] = el;
+            }}
+            className={`animate-blob absolute rounded-full blur-2xl transition-[margin] duration-200 ease-out ${blob.color}`}
+            style={{
+              width: blob.size,
+              height: blob.size,
+              left: `${blob.left}%`,
+              top: `${blob.top}%`,
+              animationDelay: `${blob.delay}s`,
+              animationDuration: `${blob.duration}s`,
+            }}
           />
-
-          <Card className="p-6 shadow-sm sm:p-8">
-            <form action={action} className="space-y-6">
-              {error && (
-                <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-                  {error}
-                </div>
-              )}
-
-              <InputField
-                id="email"
-                type="email"
-                label="Email"
-                placeholder="admin@example.com"
-                icon={Mail}
-                required
-              />
-
-              <PasswordField
-                id="password"
-                label="Password"
-                placeholder="Enter your password"
-                showPassword={showPassword}
-                onTogglePassword={() => setShowPassword((v) => !v)}
-                required
-              />
-
-              <Button type="submit">Sign in</Button>
-            </form>
-          </Card>
-        </div>
+        ))}
       </div>
 
-      <GradientBackground>
-        <HeroSection
-          title="Real-Time Threat Detection"
-          description="Monitor every device on your network, get instant alerts on MAC spoofing and ARP poisoning attempts, and block attackers with a single click."
-          icon={<ShieldCheck className="h-12 w-12" />}
-        />
-      </GradientBackground>
+      <div className="relative z-10 w-full max-w-md">
+        <div className="mb-12 text-left">
+          <span className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.3em] text-white/60">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Network Security Center
+          </span>
+          <h1 className="-ml-0.5 text-5xl font-bold leading-[0.95] tracking-tight text-white">
+            Secure
+            <br />
+            Access
+          </h1>
+        </div>
+
+        <form action={action} className="space-y-7">
+          {error && (
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <div className="group relative">
+            <label htmlFor="email" className="mb-3 block text-[11px] uppercase tracking-widest text-white/40">
+              Email
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="admin@example.com"
+                required
+                className="w-full border-b border-white/10 bg-transparent py-3 pl-7 text-lg text-white outline-none placeholder:text-white/20 focus:border-white/60"
+              />
+            </div>
+          </div>
+
+          <div className="group relative">
+            <label htmlFor="password" className="mb-3 block text-[11px] uppercase tracking-widest text-white/40">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                required
+                className="w-full border-b border-white/10 bg-transparent py-3 pl-7 pr-8 text-lg text-white outline-none placeholder:text-white/20 focus:border-white/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="mt-4 w-full rounded-lg bg-white py-4 text-sm font-bold uppercase tracking-[0.2em] text-black transition-all hover:tracking-[0.3em] hover:bg-zinc-200"
+          >
+            Access Dashboard
+          </button>
+        </form>
+
+        <p className="mt-8 text-center text-xs text-white/30">
+          Access is provisioned by your network administrator.
+        </p>
+      </div>
     </div>
   );
 }
