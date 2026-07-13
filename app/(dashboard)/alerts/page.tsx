@@ -14,13 +14,17 @@ export default async function AlertsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold text-slate-100">
-        Security Alert Log
-      </h1>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Security Alert Log</h1>
+        <p className="mt-1 text-sm text-gray-400">
+          Every time an IP appeared to switch MAC addresses. Block confirmed attackers, or
+          ignore ones you've verified are false alarms (adapter changes, DHCP renewals, etc).
+        </p>
+      </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-900 text-slate-400">
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[820px] text-left text-sm">
+          <thead className="bg-zinc-900 text-gray-400">
             <tr>
               <th className="px-4 py-3 font-medium">Time</th>
               <th className="px-4 py-3 font-medium">Target IP</th>
@@ -30,20 +34,17 @@ export default async function AlertsPage() {
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800 bg-slate-950">
+          <tbody className="divide-y divide-white/10 bg-zinc-900">
             {rows.map((alert) => (
-              <tr
-                key={alert.id}
-                className="text-slate-200 transition hover:bg-slate-900/60"
-              >
+              <tr key={alert.id} className="text-gray-300 transition hover:bg-white/10">
                 <td className="px-4 py-3">
                   {new Date(alert.created_at).toLocaleString("en-US")}
                 </td>
                 <td className="px-4 py-3">{alert.target_ip}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">
                   {alert.real_mac}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-red-300">
+                <td className="px-4 py-3 font-mono text-xs text-red-400">
                   {alert.attacker_mac}
                 </td>
                 <td className="px-4 py-3">
@@ -52,30 +53,25 @@ export default async function AlertsPage() {
                       alert.status === "unhandled"
                         ? "danger"
                         : alert.status === "blocked"
-                        ? "success"
-                        : "neutral"
+                          ? "success"
+                          : "neutral"
                     }
                   >
                     {alert.status === "unhandled"
                       ? "Unhandled"
                       : alert.status === "blocked"
-                      ? "Blocked"
-                      : "Ignored"}
+                        ? "Blocked"
+                        : "Ignored"}
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
-                  {alert.status === "unhandled" && (
-                    <AlertRowActions alert={alert} />
-                  )}
+                  {alert.status === "unhandled" && <AlertRowActions alert={alert} />}
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-6 text-center text-slate-500"
-                >
+                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
                   No alerts recorded yet.
                 </td>
               </tr>

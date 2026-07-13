@@ -26,20 +26,20 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-300">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
           <Icon className="h-4 w-4" />
         </span>
         {label}
       </label>
       {children}
-      {hint && <p className="mt-1.5 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
 
 const inputClassName =
-  "w-full rounded-xl border border-slate-700 bg-slate-950/50 px-3 py-2.5 text-slate-100 outline-none transition focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20";
+  "w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-white focus:ring-2 focus:ring-white/10";
 
 export function SettingsForm({ config }: { config: RouterConfig | null }) {
   const [isPending, startTransition] = useTransition();
@@ -63,10 +63,10 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
   return (
     <form
       action={handleSubmit}
-      className="max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8"
+      className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8"
     >
       <div className="flex flex-col gap-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Router Connection
         </p>
 
@@ -97,10 +97,10 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
         </FormField>
       </div>
 
-      <div className="my-6 border-t border-slate-800" />
+      <div className="my-6 border-t border-white/10" />
 
       <div className="flex flex-col gap-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Detection Behavior
         </p>
 
@@ -134,14 +134,14 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
       <button
         type="submit"
         disabled={isPending}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 py-2.5 text-sm font-medium text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.25)] transition hover:from-emerald-400 hover:to-emerald-300 hover:shadow-[0_0_28px_rgba(16,185,129,0.4)] disabled:opacity-50"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-medium text-black transition-all hover:tracking-[0.15em] hover:bg-zinc-200 disabled:opacity-50"
       >
         <Save className="h-4 w-4" />
         Save Settings
       </button>
 
       {status === "saved" && (
-        <p className="mt-3 flex items-center gap-1.5 text-sm text-emerald-400">
+        <p className="mt-3 flex items-center gap-1.5 text-sm text-white">
           <CheckCircle2 className="h-4 w-4" />
           Settings saved.
         </p>

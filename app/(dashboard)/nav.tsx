@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
 import {
   LayoutDashboard,
   Wifi,
@@ -12,10 +12,12 @@ import {
   ShieldCheck,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { signOut } from "@/app/login/actions";
 import { cn } from "@/lib/utils";
 
@@ -27,16 +29,22 @@ const links = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-function SignOutButton({ className }: { className?: string }) {
+function Brand() {
   return (
-    <form action={signOut}>
+    <span className="flex min-w-0 items-center gap-2 text-base font-semibold text-white">
+      <ShieldCheck className="h-5 w-5 shrink-0" />
+      <span className="truncate">Network Security Center</span>
+    </span>
+  );
+}
+
+function SignOutButton() {
+  return (
+    <form action={signOut} className="w-full">
       <Button
         type="submit"
         variant="ghost"
-        className={cn(
-          "h-8 gap-2 px-2 text-sm font-normal text-muted-foreground hover:text-foreground",
-          className
-        )}
+        className="h-9 w-full justify-start gap-2 px-3 text-sm font-normal text-muted-foreground hover:text-foreground"
       >
         <LogOut className="h-4 w-4" />
         Sign Out
@@ -45,85 +53,131 @@ function SignOutButton({ className }: { className?: string }) {
   );
 }
 
-export function DashboardNav() {
+function NavLinkItem({
+  href,
+  label,
+  icon: Icon,
+}: {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+}) {
   const pathname = usePathname();
+  const isActive = pathname === href;
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+        isActive
+          ? "bg-white/10 text-white"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground/80"
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{label}</span>
+    </Link>
+  );
+}
+
+function DesktopNavLinks() {
+  return (
+    <nav className="flex flex-col gap-1">
+      {links.map((link) => (
+        <NavLinkItem key={link.href} {...link} />
+      ))}
+    </nav>
+  );
+}
+
+function MobileNavLinks() {
+  return (
+    <nav className="flex flex-col gap-1">
+      {links.map((link) => (
+        <SheetClose asChild key={link.href}>
+          <NavLinkItem {...link} />
+        </SheetClose>
+      ))}
+    </nav>
+  );
+}
+
+export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const [desktopOpen, setDesktopOpen] = useState(true);
 
   return (
-    <motion.nav
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="flex items-center justify-between rounded-xl border border-white/10 bg-[#11141d] px-4 py-2 shadow-lg"
-    >
-      <div className="flex items-center space-x-6">
-        <span className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <ShieldCheck className="h-5 w-5 text-emerald-400" />
-          Network Security Center
-        </span>
-        <div className="hidden items-center space-x-1 md:flex">
-          {links.map((link) => {
-            const isActive = pathname === link.href;
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
-                  isActive
-                    ? "bg-emerald-500/10 text-emerald-400"
-                    : "text-muted-foreground hover:text-foreground/80"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {link.label}
-              </Link>
-            );
-          })}
+    <div className="min-h-full bg-black text-slate-100">
+      {/* Desktop sidebar — fixed left, open by default, collapsible */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-20 hidden flex-col overflow-hidden border-white/10 bg-zinc-900 transition-all duration-300 ease-in-out md:flex",
+          desktopOpen ? "w-56 border-r" : "w-0 border-r-0"
+        )}
+      >
+        <div className="flex h-full w-56 flex-col px-4 py-6">
+          <div className="mb-8 flex items-center justify-between gap-2 px-1">
+            <Brand />
+            <button
+              type="button"
+              onClick={() => setDesktopOpen(false)}
+              className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-white/5 hover:text-white"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </div>
+          <DesktopNavLinks />
+          <div className="mt-auto pt-4">
+            <Separator className="mb-3 bg-white/10" />
+            <SignOutButton />
+          </div>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex items-center space-x-3">
-        <Separator orientation="vertical" className="hidden h-6 md:block" />
-        <SignOutButton className="hidden md:inline-flex" />
+      {/* Reopen button — only rendered once the sidebar is collapsed */}
+      {!desktopOpen && (
+        <button
+          type="button"
+          onClick={() => setDesktopOpen(true)}
+          className="fixed left-4 top-4 z-30 hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-900 text-muted-foreground transition-colors hover:text-white md:flex"
+          aria-label="Expand sidebar"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+      )}
 
+      {/* Mobile top bar — closed by default, opens as a slide-in drawer */}
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-zinc-900 px-4 py-3 md:hidden">
+        <Brand />
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
               <Menu className="h-[18px] w-[18px]" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent
-            side="right"
-            className="w-[240px] border-white/10 bg-[#11141d] sm:w-[300px]"
-          >
-            <nav className="mt-8 flex flex-col space-y-1">
-              {links.map((link) => {
-                const isActive = pathname === link.href;
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                      isActive
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : "text-muted-foreground hover:text-foreground/80"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-              <Separator className="my-2" />
-              <SignOutButton className="justify-start px-3" />
-            </nav>
+          <SheetContent side="left" className="flex w-[240px] flex-col border-white/10 bg-zinc-900">
+            <div className="mt-8 flex flex-1 flex-col">
+              <MobileNavLinks />
+              <div className="mt-auto pt-4">
+                <Separator className="mb-3 bg-white/10" />
+                <SignOutButton />
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
-    </motion.nav>
+
+      <main
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          desktopOpen ? "md:pl-56" : "md:pl-0"
+        )}
+      >
+        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 md:px-8 md:py-8">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
