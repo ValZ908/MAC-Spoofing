@@ -14,14 +14,23 @@ export type Device = {
 
 export type AlertStatus = "unhandled" | "blocked" | "ignored";
 
+export type AttackType = "ip_mac_mismatch" | "arp_poisoning";
+
 export type Alert = {
   id: string;
   created_at: string;
+  attack_type: AttackType;
   target_ip: string;
   real_mac: string;
   attacker_mac: string;
   status: AlertStatus;
   device_id: string | null;
+};
+
+export type DetectorHeartbeat = {
+  id: string;
+  hostname: string;
+  last_seen: string;
 };
 
 export type RouterConfig = {

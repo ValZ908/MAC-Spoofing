@@ -12,10 +12,10 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import type { AdapterLock, MacRotationLogEntry, NetworkAdapter } from "@/lib/types";
 import {
   getAdapters,
+  getIdentityData,
   lockAdapter,
   unlockAdapter,
   rotateAdapterMac,
@@ -40,37 +40,6 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
   const [isClearingLog, setIsClearingLog] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel("identity-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "mac_rotation_log" },
-        async () => {
-          const { data } = await supabase
-            .from("mac_rotation_log")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(20);
-          setLog((data as MacRotationLogEntry[]) ?? []);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "adapter_locks" },
-        async () => {
-          const { data } = await supabase.from("adapter_locks").select("*");
-          setLocks((data as AdapterLock[]) ?? []);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   async function refreshAdapters() {
     const result = await getAdapters();
     if (result.success) {
@@ -80,6 +49,12 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
       setAdapterError(result.error);
     }
     setAdaptersLoading(false);
+  }
+
+  async function refreshIdentityData() {
+    const data = await getIdentityData();
+    setLog(data.log);
+    setLocks(data.locks);
   }
 
   useEffect(() => {
@@ -96,8 +71,13 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
       setAdaptersLoading(false);
     });
 
+    const interval = setInterval(() => {
+      void refreshIdentityData();
+    }, 5_000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
@@ -111,7 +91,7 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
       if (!result.success) {
         setLockError(result.error);
       } else {
-        await refreshAdapters();
+        await Promise.all([refreshAdapters(), refreshIdentityData()]);
       }
       setLockingAdapter(null);
     });
@@ -125,7 +105,7 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
       if (!result.success) {
         setRotateError(result.error);
       } else {
-        await refreshAdapters();
+        await Promise.all([refreshAdapters(), refreshIdentityData()]);
       }
       setRotatingAdapter(null);
     });
@@ -148,7 +128,6 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
         Network Identity
       </h1>
 
-      {/* Status card */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 p-8 text-center backdrop-blur-xl">
         <div className="animate-scan absolute left-0 h-0.5 w-full bg-gradient-to-r from-transparent via-white/60 to-transparent" />
         <div className="relative z-10 flex flex-col items-center">
@@ -177,7 +156,6 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Adapter list */}
         <div className="rounded-3xl border border-white/10 bg-zinc-900 p-6 backdrop-blur-xl">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
@@ -270,8 +248,8 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
                       {lockingAdapter === adapter.name
                         ? "…"
                         : isLocked
-                        ? "Unlock"
-                        : "Lock"}
+                          ? "Unlock"
+                          : "Lock"}
                     </button>
                   </div>
                 </div>
@@ -290,7 +268,6 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
           </div>
         </div>
 
-        {/* Security log */}
         <div className="rounded-3xl border border-white/10 bg-zinc-900 p-6 backdrop-blur-xl">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">

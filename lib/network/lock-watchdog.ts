@@ -1,6 +1,11 @@
-import { createServiceClient } from "@/lib/supabase/service";
-import { listNetworkAdapters, resetAdapterToHardwareMac } from "./windows-adapter";
-import { withRetry } from "@/lib/retry";
+import {
+  insertMacRotationLog,
+  listAdapterLocks,
+} from "@/lib/db/queries";
+import {
+  listNetworkAdapters,
+  resetAdapterToHardwareMac,
+} from "./windows-adapter";
 import type { AdapterLock } from "@/lib/types";
 
 const CHECK_INTERVAL_MS = 15_000;
@@ -9,8 +14,7 @@ let started = false;
 
 /**
  * Periodically checks locked adapters against their real MAC and reverts
- * + logs an alert if anything (an attacker, malware, or an accidental
- * change) alters one. Runs only while this Node.js server process is alive.
+ * + logs if anything alters one. Runs while this Node.js server is alive.
  */
 export function startAdapterLockWatchdog() {
   if (started) return;
@@ -28,18 +32,12 @@ export function startAdapterLockWatchdog() {
 }
 
 async function checkLockedAdapters() {
-  const supabase = createServiceClient();
-
-  const { data: locks, error } = await supabase
-    .from("adapter_locks")
-    .select("*")
-    .eq("is_locked", true);
-
-  if (error || !locks || locks.length === 0) return;
+  const locks = listAdapterLocks().filter((l: AdapterLock) => l.is_locked);
+  if (locks.length === 0) return;
 
   const adapters = await listNetworkAdapters();
 
-  for (const lock of locks as AdapterLock[]) {
+  for (const lock of locks) {
     const adapter = adapters.find((a) => a.name === lock.adapter_name);
     if (!adapter || !adapter.macAddress) continue;
 
@@ -52,21 +50,13 @@ async function checkLockedAdapters() {
       const previousMac = adapter.macAddress;
       const result = await resetAdapterToHardwareMac(lock.adapter_name);
 
-      // Restarting the adapter can briefly cut the connection to Supabase
-      // if it's the machine's active internet adapter, so retry the log
-      // write while it reconnects instead of silently dropping the entry.
       try {
-        await withRetry(
-          () =>
-            supabase.from("mac_rotation_log").insert({
-              adapter_name: lock.adapter_name,
-              previous_mac: previousMac,
-              new_mac: lock.locked_mac,
-              triggered_by: "lock_enforcement",
-            }),
-          6,
-          3000
-        );
+        insertMacRotationLog({
+          adapter_name: lock.adapter_name,
+          previous_mac: previousMac,
+          new_mac: lock.locked_mac,
+          triggered_by: "lock_enforcement",
+        });
       } catch (err) {
         console.error(
           `[adapter-lock-watchdog] Failed to log enforcement for ${lock.adapter_name}:`,

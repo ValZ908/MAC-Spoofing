@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Local Network Security Center
 
-## Getting Started
+Self-contained Windows tool for **ARP MAC-spoofing detection**, **router MAC blocking**, and **local adapter MAC rotation**. Everything runs on your machine — **no cloud account, no `.env` file**.
 
-First, run the development server:
+## Requirements
+
+- Windows 10/11
+- Node.js 20+
+- Python 3.10+
+- Npcap (required by Scapy for packet capture)
+- Administrator privileges for MAC changes and ARP sniffing
+- Optional: SSH-capable router for auto-block / Disconnect
+
+## Quick start
 
 ```bash
+# 1. Install JS deps
+npm install
+
+# 2. Install Python deps
+pip install -r requirements.txt
+
+# 3. Start the dashboard (creates data/app.db automatically)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+In a **separate Administrator** terminal:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+python detector.py
+```
 
-## Learn More
+The dashboard shows the detector as Online once heartbeats arrive (~10s).
 
-To learn more about Next.js, take a look at the following resources:
+## Features that actually do something
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Feature | What it does |
+|---|---|
+| Detector | Sniffs ARP replies, upserts devices, raises alerts |
+| Auto-block | SSH into your router using Settings → Block Command |
+| Disconnect | Same SSH block for a chosen device MAC |
+| Trust | Skips auto-block when the attacker MAC is trusted |
+| Identity Rotate | Changes Windows adapter NetworkAddress via PowerShell |
+| Identity Lock | Watchdog reverts unauthorized MAC changes |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Settings
 
-## Deploy on Vercel
+Fill in **Settings** with your router's IP, SSH credentials, and a block command. Use `{mac}` as the placeholder, e.g.:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```text
+iptables -A FORWARD -m mac --mac-source {mac} -j DROP
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Sensitivity (seconds) is the window in which a sudden IP→MAC change counts as spoofing.
+
+## Lab test
+
+With the dashboard and detector running:
+
+```bash
+# Edit TARGET_IP in test_spoof.py first
+python test_spoof.py
+```
+
+## Data
+
+All state is stored in `data/app.db` (SQLite, auto-created, gitignored).
+
+Optional detector API override:
+
+```bash
+python detector.py --api http://127.0.0.1:3000
+```
+
+## Notes
+
+- Run `npm run dev` **as Administrator** if you want Identity Lock / Rotate to succeed on the live internet adapter.
+- This is a local admin tool; there is no login screen. Do not expose port 3000 to untrusted networks.
