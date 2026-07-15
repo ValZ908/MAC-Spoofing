@@ -1,10 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, ShieldAlert, ShieldQuestion, Wifi, Bell, Lock, Ban, Radio } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import {
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  Wifi,
+  Bell,
+  Lock,
+  Ban,
+  Radio,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Alert, DetectorHeartbeat } from "@/lib/types";
+
+type DashboardSnapshot = {
+  activeDeviceCount: number;
+  trustedDeviceCount: number;
+  recentAlerts: Alert[];
+  unhandledCount: number;
+  blockedCount: number;
+  totalAlertCount: number;
+  lastHeartbeat: DetectorHeartbeat | null;
+};
 
 type Props = {
   initialActiveDeviceCount: number;
@@ -14,11 +32,8 @@ type Props = {
   initialBlockedCount: number;
   initialTotalAlertCount: number;
   initialLastHeartbeat: DetectorHeartbeat | null;
-  initialHeartbeatFeatureEnabled: boolean;
 };
 
-// Detector sends a heartbeat every 10s (see detector.py). Anything older
-// than 2.5x that interval is treated as offline.
 const HEARTBEAT_STALE_MS = 25_000;
 
 const badgeVariant: Record<Alert["status"], "success" | "danger" | "neutral"> = {
@@ -49,9 +64,13 @@ function StatCard({
     <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4 sm:p-6">
       <div className="mb-4 flex items-center gap-2 text-gray-400 sm:mb-6">
         <Icon className="h-4 w-4" />
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] sm:text-xs">{label}</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] sm:text-xs">
+          {label}
+        </h3>
       </div>
-      <span className={`text-2xl font-bold tracking-tight sm:text-4xl ${valueColor}`}>{value}</span>
+      <span className={`text-2xl font-bold tracking-tight sm:text-4xl ${valueColor}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -64,7 +83,6 @@ export function DashboardClient({
   initialBlockedCount,
   initialTotalAlertCount,
   initialLastHeartbeat,
-  initialHeartbeatFeatureEnabled,
 }: Props) {
   const [activeDeviceCount, setActiveDeviceCount] = useState(initialActiveDeviceCount);
   const [trustedDeviceCount, setTrustedDeviceCount] = useState(initialTrustedDeviceCount);
@@ -73,112 +91,67 @@ export function DashboardClient({
   const [blockedCount, setBlockedCount] = useState(initialBlockedCount);
   const [totalAlertCount, setTotalAlertCount] = useState(initialTotalAlertCount);
   const [lastHeartbeat, setLastHeartbeat] = useState(initialLastHeartbeat);
-  const [heartbeatFeatureEnabled] = useState(initialHeartbeatFeatureEnabled);
   const [now, setNow] = useState(() => Date.now());
 
-  // Re-check heartbeat staleness periodically, even if no new realtime
-  // event arrives (which is exactly what happens when the detector dies).
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 5_000);
-    return () => clearInterval(interval);
+    const tick = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(tick);
   }, []);
 
   useEffect(() => {
-    const supabase = createClient();
+    let cancelled = false;
 
-    const refreshAlertStats = async () => {
-      const [{ data: alerts }, { count: unhandled }, { count: blocked }, { count: total }] =
-        await Promise.all([
-          supabase
-            .from("alerts")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(5),
-          supabase
-            .from("alerts")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "unhandled"),
-          supabase
-            .from("alerts")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "blocked"),
-          supabase.from("alerts").select("*", { count: "exact", head: true }),
-        ]);
-      setRecentAlerts((alerts as Alert[]) ?? []);
-      setUnhandledCount(unhandled ?? 0);
-      setBlockedCount(blocked ?? 0);
-      setTotalAlertCount(total ?? 0);
-    };
+    async function refresh() {
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as DashboardSnapshot;
+        if (cancelled) return;
+        setActiveDeviceCount(data.activeDeviceCount);
+        setTrustedDeviceCount(data.trustedDeviceCount);
+        setRecentAlerts(data.recentAlerts);
+        setUnhandledCount(data.unhandledCount);
+        setBlockedCount(data.blockedCount);
+        setTotalAlertCount(data.totalAlertCount);
+        setLastHeartbeat(data.lastHeartbeat);
+      } catch {
+        // Keep last known snapshot if the server briefly restarts.
+      }
+    }
 
-    const refreshDeviceStats = async () => {
-      const [{ count: active }, { count: trusted }] = await Promise.all([
-        supabase
-          .from("devices")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "active"),
-        supabase
-          .from("devices")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "active")
-          .eq("is_trusted", true),
-      ]);
-      setActiveDeviceCount(active ?? 0);
-      setTrustedDeviceCount(trusted ?? 0);
-    };
-
-    const channel = supabase
-      .channel("dashboard-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "alerts" },
-        refreshAlertStats
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "devices" },
-        refreshDeviceStats
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "detector_heartbeat" },
-        (payload) => setLastHeartbeat(payload.new as DetectorHeartbeat)
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error("[dashboard] realtime subscription issue:", status);
-        }
-      });
+    const interval = setInterval(() => {
+      void refresh();
+    }, 5_000);
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
   const isDanger = unhandledCount > 0;
   const unknownDeviceCount = Math.max(activeDeviceCount - trustedDeviceCount, 0);
   const trustRatio =
-    activeDeviceCount > 0 ? Math.round((trustedDeviceCount / activeDeviceCount) * 100) : 0;
+    activeDeviceCount > 0
+      ? Math.round((trustedDeviceCount / activeDeviceCount) * 100)
+      : 0;
   const lastEventAt = recentAlerts[0]?.created_at;
 
   const secondsSinceHeartbeat = lastHeartbeat
     ? Math.round((now - new Date(lastHeartbeat.last_seen).getTime()) / 1000)
     : null;
   const isDetectorOnline =
-    lastHeartbeat !== null && now - new Date(lastHeartbeat.last_seen).getTime() < HEARTBEAT_STALE_MS;
+    lastHeartbeat !== null &&
+    now - new Date(lastHeartbeat.last_seen).getTime() < HEARTBEAT_STALE_MS;
 
-  // Priority: an active attack always wins. Otherwise, if the sniffer
-  // itself is offline we genuinely don't know the network state, so we
-  // can't honestly claim "Secure". Skip this downgrade entirely if the
-  // heartbeat table isn't deployed yet (migration 0004 pending).
   const bannerState: "danger" | "warning" | "secure" = isDanger
     ? "danger"
-    : !heartbeatFeatureEnabled || isDetectorOnline
+    : isDetectorOnline
       ? "secure"
       : "warning";
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Hero status banner */}
       <div
         className={`flex flex-col items-start gap-4 rounded-3xl border p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6 ${
           bannerState === "danger"
@@ -235,7 +208,6 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard icon={Wifi} label="Active Devices" value={activeDeviceCount} />
         <StatCard icon={Lock} label="Trusted Devices" value={trustedDeviceCount} />
@@ -248,12 +220,13 @@ export function DashboardClient({
         <StatCard icon={Ban} label="Blocked Attacks" value={blockedCount} />
       </div>
 
-      {/* Widgets */}
       <div className="grid grid-cols-1 gap-4 sm:gap-8 lg:grid-cols-12">
         <div className="flex flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:rounded-[32px] sm:p-10 lg:col-span-7">
           <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
             <Bell className="h-5 w-5" />
-            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">Recent Alerts</h3>
+            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">
+              Recent Alerts
+            </h3>
           </div>
 
           {recentAlerts.length === 0 ? (
@@ -282,7 +255,9 @@ export function DashboardClient({
         <div className="flex min-h-[260px] flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:min-h-[300px] sm:rounded-[32px] sm:p-10 lg:col-span-5">
           <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
             <ShieldCheck className="h-5 w-5" />
-            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">Device Trust</h3>
+            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">
+              Device Trust
+            </h3>
           </div>
 
           <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
@@ -290,17 +265,13 @@ export function DashboardClient({
               <Radio className="h-4 w-4" />
               Detector Agent
             </span>
-            {heartbeatFeatureEnabled ? (
-              <Badge variant={isDetectorOnline ? "success" : "danger"}>
-                {isDetectorOnline
-                  ? "Online"
-                  : lastHeartbeat
-                    ? `Offline (${secondsSinceHeartbeat}s ago)`
-                    : "Never seen"}
-              </Badge>
-            ) : (
-              <Badge variant="neutral">Pending migration</Badge>
-            )}
+            <Badge variant={isDetectorOnline ? "success" : "danger"}>
+              {isDetectorOnline
+                ? "Online"
+                : lastHeartbeat
+                  ? `Offline (${secondsSinceHeartbeat}s ago)`
+                  : "Never seen"}
+            </Badge>
           </div>
 
           {activeDeviceCount === 0 ? (
@@ -331,7 +302,9 @@ export function DashboardClient({
 
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
                 <span className="text-sm text-gray-400">Total alerts logged</span>
-                <span className="text-sm font-semibold text-gray-300">{totalAlertCount}</span>
+                <span className="text-sm font-semibold text-gray-300">
+                  {totalAlertCount}
+                </span>
               </div>
             </div>
           )}

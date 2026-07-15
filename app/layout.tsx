@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Network Security Center",
-  description: "Dashboard deteksi MAC spoofing / ARP poisoning",
+  description: "Local MAC spoofing / ARP poisoning monitor",
 };
 
 export default function RootLayout({

@@ -1,7 +1,6 @@
 /**
- * Retries an async operation that may transiently fail — e.g. a Supabase
- * request made right after restarting the network adapter carrying that
- * connection, which briefly drops connectivity while it reconnects.
+ * Retries an async operation that may transiently fail after restarting a
+ * network adapter that briefly drops connectivity while it reconnects.
  */
 export async function withRetry<T>(
   fn: () => PromiseLike<T>,

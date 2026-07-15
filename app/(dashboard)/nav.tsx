@@ -10,15 +10,12 @@ import {
   Fingerprint,
   Settings,
   ShieldCheck,
-  LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
-import { signOut } from "@/app/login/actions";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -35,21 +32,6 @@ function Brand() {
       <ShieldCheck className="h-5 w-5 shrink-0" />
       <span className="truncate">Network Security Center</span>
     </span>
-  );
-}
-
-function SignOutButton() {
-  return (
-    <form action={signOut} className="w-full">
-      <Button
-        type="submit"
-        variant="ghost"
-        className="h-9 w-full justify-start gap-2 px-3 text-sm font-normal text-muted-foreground hover:text-foreground"
-      >
-        <LogOut className="h-4 w-4" />
-        Sign Out
-      </Button>
-    </form>
   );
 }
 
@@ -127,10 +109,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           <DesktopNavLinks />
-          <div className="mt-auto pt-4">
-            <Separator className="mb-3 bg-white/10" />
-            <SignOutButton />
-          </div>
         </div>
       </aside>
 
@@ -159,10 +137,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <SheetContent side="left" className="flex w-[240px] flex-col border-white/10 bg-zinc-900">
             <div className="mt-8 flex flex-1 flex-col">
               <MobileNavLinks />
-              <div className="mt-auto pt-4">
-                <Separator className="mb-3 bg-white/10" />
-                <SignOutButton />
-              </div>
             </div>
           </SheetContent>
         </Sheet>

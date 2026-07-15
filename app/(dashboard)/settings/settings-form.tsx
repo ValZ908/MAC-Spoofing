@@ -119,7 +119,7 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
         <FormField
           icon={Timer}
           label="Sensitivity (seconds)"
-          hint="Minimum time window for an IP change to be flagged as spoofing."
+          hint="Maximum time window for a sudden IP→MAC change to be flagged as spoofing."
         >
           <input
             name="spoof_window_seconds"

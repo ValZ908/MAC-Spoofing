@@ -1,33 +1,39 @@
 """
-Skrip TEST untuk memicu alert MAC spoofing secara sengaja, di jaringan
-sendiri, supaya bisa memverifikasi detector.py benar-benar mendeteksinya.
+Lab helper: intentionally emit a fake ARP reply so you can verify that
+detector.py raises an alert on the local dashboard.
 
-Cara pakai:
-1. Pastikan detector.py sudah berjalan (di terminal Administrator lain).
-2. Ganti TARGET_IP di bawah dengan salah satu IP yang sudah muncul di
-   halaman Devices (harus IP yang SUDAH pernah terdeteksi sebelumnya).
-3. Jalankan skrip ini juga sebagai Administrator:
-     python test_spoof.py
-4. Lihat terminal detector.py: seharusnya muncul "[BAHAYA!] MAC Spoofing
-   Terdeteksi", dan alert baru muncul di halaman Alerts pada website.
+Usage:
+1. Start the dashboard: npm run dev
+2. Start the detector (Administrator terminal): python detector.py
+3. Set TARGET_IP to an IP already listed under Devices.
+4. Run this script as Administrator: python test_spoof.py
+5. Check the detector terminal and the Alerts page.
 """
 
-from scapy.all import ARP, Ether, sendp
 import random
 
-# Ganti dengan IP yang sudah terdeteksi di halaman Devices, misalnya:
-TARGET_IP = "172.18.252.34"
+from scapy.all import ARP, Ether, sendp
 
-fake_mac = "de:ad:be:ef:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255))
+# Change to an IP that already appears on the Devices page, for example:
+TARGET_IP = "192.168.1.10"
 
-print(f"[TEST] Mengirim ARP reply palsu: IP {TARGET_IP} sekarang diklaim oleh MAC {fake_mac}")
+fake_mac = "de:ad:be:ef:%02x:%02x" % (
+    random.randint(0, 255),
+    random.randint(0, 255),
+)
+
+print(
+    f"[TEST] Sending fake ARP reply: IP {TARGET_IP} claimed by MAC {fake_mac}"
+)
 
 packet = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(
-    op=2,  # ARP reply
+    op=2,
     psrc=TARGET_IP,
     hwsrc=fake_mac,
 )
 
 sendp(packet, count=3, inter=0.2, verbose=True)
 
-print("[TEST] Selesai mengirim. Cek terminal detector.py dan halaman Alerts di website.")
+print(
+    "[TEST] Done. Check the detector terminal and the Alerts page in the dashboard."
+)

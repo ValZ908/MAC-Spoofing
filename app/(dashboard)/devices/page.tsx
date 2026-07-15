@@ -1,19 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
-import type { Device } from "@/lib/types";
+import { listDevices } from "@/lib/db/queries";
 import { Badge } from "@/components/ui/badge";
 import { DeviceRowActions } from "./device-row-actions";
+import { LiveRefresh } from "@/components/live-refresh";
 
 export default async function DevicesPage() {
-  const supabase = await createClient();
-  const { data: devices } = await supabase
-    .from("devices")
-    .select("*")
-    .order("last_seen", { ascending: false });
-
-  const rows = (devices as Device[]) ?? [];
+  const rows = listDevices();
 
   return (
     <div className="flex flex-col gap-4">
+      <LiveRefresh />
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Connected Devices</h1>
         <p className="mt-1 text-sm text-gray-400">
