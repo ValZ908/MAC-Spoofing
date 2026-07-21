@@ -5,6 +5,7 @@ import type {
   AlertStatus,
   DetectorHeartbeat,
   Device,
+  GatewayLock,
   MacRotationLogEntry,
   RouterConfig,
   TriggerReason,
@@ -50,6 +51,15 @@ type LockRow = {
   updated_at: string;
 };
 
+type GatewayLockRow = {
+  id: string;
+  gateway_ip: string;
+  interface_alias: string;
+  locked_mac: string;
+  is_locked: number;
+  updated_at: string;
+};
+
 type RotationRow = {
   id: string;
   created_at: string;
@@ -86,6 +96,13 @@ function mapAlert(row: AlertRow): Alert {
 }
 
 function mapLock(row: LockRow): AdapterLock {
+  return {
+    ...row,
+    is_locked: intToBool(row.is_locked),
+  };
+}
+
+function mapGatewayLock(row: GatewayLockRow): GatewayLock {
   return {
     ...row,
     is_locked: intToBool(row.is_locked),
@@ -347,6 +364,67 @@ export function setAdapterUnlocked(adapterName: string): void {
       `UPDATE adapter_locks SET is_locked = 0, updated_at = ? WHERE adapter_name = ?`
     )
     .run(nowIso(), adapterName);
+}
+
+// --- Gateway locks (static ARP pin) ---
+
+export function listGatewayLocks(): GatewayLock[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM gateway_locks")
+    .all() as GatewayLockRow[];
+  return rows.map(mapGatewayLock);
+}
+
+export function getGatewayLock(gatewayIp: string): GatewayLock | null {
+  const row = getDb()
+    .prepare("SELECT * FROM gateway_locks WHERE gateway_ip = ?")
+    .get(gatewayIp) as GatewayLockRow | undefined;
+  return row ? mapGatewayLock(row) : null;
+}
+
+export function upsertGatewayLock(input: {
+  gateway_ip: string;
+  interface_alias: string;
+  locked_mac: string;
+  is_locked: boolean;
+}): void {
+  const db = getDb();
+  const existing = getGatewayLock(input.gateway_ip);
+  const ts = nowIso();
+  if (existing) {
+    db.prepare(
+      `UPDATE gateway_locks
+       SET interface_alias = ?, locked_mac = ?, is_locked = ?, updated_at = ?
+       WHERE gateway_ip = ?`
+    ).run(
+      input.interface_alias,
+      input.locked_mac,
+      boolToInt(input.is_locked),
+      ts,
+      input.gateway_ip
+    );
+    return;
+  }
+  db.prepare(
+    `INSERT INTO gateway_locks
+      (id, gateway_ip, interface_alias, locked_mac, is_locked, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    crypto.randomUUID(),
+    input.gateway_ip,
+    input.interface_alias,
+    input.locked_mac,
+    boolToInt(input.is_locked),
+    ts
+  );
+}
+
+export function setGatewayUnlocked(gatewayIp: string): void {
+  getDb()
+    .prepare(
+      `UPDATE gateway_locks SET is_locked = 0, updated_at = ? WHERE gateway_ip = ?`
+    )
+    .run(nowIso(), gatewayIp);
 }
 
 // --- MAC rotation log ---

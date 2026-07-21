@@ -69,3 +69,18 @@ export type AdapterLock = {
   is_locked: boolean;
   updated_at: string;
 };
+
+export type GatewayLock = {
+  id: string;
+  gateway_ip: string;
+  interface_alias: string;
+  locked_mac: string;
+  is_locked: boolean;
+  updated_at: string;
+};
+
+export type GatewayInfo = {
+  ip: string;
+  interfaceAlias: string;
+  macAddress: string | null;
+};

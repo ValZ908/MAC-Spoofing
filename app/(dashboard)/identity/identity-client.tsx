@@ -11,28 +11,52 @@ import {
   AlertTriangle,
   Lock,
   Unlock,
+  ShieldCheck,
+  Router,
 } from "lucide-react";
-import type { AdapterLock, MacRotationLogEntry, NetworkAdapter } from "@/lib/types";
+import type {
+  AdapterLock,
+  GatewayInfo,
+  GatewayLock,
+  MacRotationLogEntry,
+  NetworkAdapter,
+} from "@/lib/types";
 import {
   getAdapters,
   getIdentityData,
+  getGatewayInfo,
   lockAdapter,
   unlockAdapter,
   rotateAdapterMac,
+  pinGateway,
+  unpinGateway,
   clearSecurityLog,
 } from "./actions";
 
 type Props = {
   initialLog: MacRotationLogEntry[];
   initialLocks: AdapterLock[];
+  initialGatewayLocks: GatewayLock[];
 };
 
-export function IdentityClient({ initialLog, initialLocks }: Props) {
+export function IdentityClient({
+  initialLog,
+  initialLocks,
+  initialGatewayLocks,
+}: Props) {
   const [adapters, setAdapters] = useState<NetworkAdapter[]>([]);
   const [adaptersLoading, setAdaptersLoading] = useState(true);
   const [adapterError, setAdapterError] = useState<string | null>(null);
   const [log, setLog] = useState(initialLog);
   const [locks, setLocks] = useState(initialLocks);
+  const [gatewayLocks, setGatewayLocks] = useState(initialGatewayLocks);
+  const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
+  const [gatewayInfoLoading, setGatewayInfoLoading] = useState(true);
+  const [gatewayInfoError, setGatewayInfoError] = useState<string | null>(
+    null
+  );
+  const [pinningGateway, setPinningGateway] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [lockingAdapter, setLockingAdapter] = useState<string | null>(null);
   const [rotatingAdapter, setRotatingAdapter] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
@@ -55,21 +79,56 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
     const data = await getIdentityData();
     setLog(data.log);
     setLocks(data.locks);
+    setGatewayLocks(data.gatewayLocks);
+  }
+
+  async function refreshGatewayInfo() {
+    const result = await getGatewayInfo();
+    if (result.success) {
+      setGatewayInfo(result.gateway);
+      setGatewayInfoError(null);
+    } else {
+      setGatewayInfoError(result.error);
+    }
+    setGatewayInfoLoading(false);
   }
 
   useEffect(() => {
     let cancelled = false;
 
-    getAdapters().then((result) => {
-      if (cancelled) return;
-      if (result.success) {
-        setAdapters(result.adapters);
-        setAdapterError(null);
-      } else {
-        setAdapterError(result.error);
-      }
-      setAdaptersLoading(false);
-    });
+    getAdapters()
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success) {
+          setAdapters(result.adapters);
+          setAdapterError(null);
+        } else {
+          setAdapterError(result.error);
+        }
+        setAdaptersLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setAdapterError(err instanceof Error ? err.message : String(err));
+        setAdaptersLoading(false);
+      });
+
+    getGatewayInfo()
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success) {
+          setGatewayInfo(result.gateway);
+          setGatewayInfoError(null);
+        } else {
+          setGatewayInfoError(result.error);
+        }
+        setGatewayInfoLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setGatewayInfoError(err instanceof Error ? err.message : String(err));
+        setGatewayInfoLoading(false);
+      });
 
     const interval = setInterval(() => {
       void refreshIdentityData();
@@ -108,6 +167,23 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
         await Promise.all([refreshAdapters(), refreshIdentityData()]);
       }
       setRotatingAdapter(null);
+    });
+  }
+
+  function handlePinToggle(isLocked: boolean) {
+    setPinError(null);
+    setPinningGateway(true);
+    startTransition(async () => {
+      const result =
+        isLocked && gatewayInfo
+          ? await unpinGateway(gatewayInfo.ip)
+          : await pinGateway();
+      if (!result.success) {
+        setPinError(result.error);
+      } else {
+        await Promise.all([refreshGatewayInfo(), refreshIdentityData()]);
+      }
+      setPinningGateway(false);
     });
   }
 
@@ -154,6 +230,104 @@ export function IdentityClient({ initialLog, initialLocks }: Props) {
           Couldn&apos;t read network adapters: {adapterError}
         </div>
       )}
+
+      {/* Gateway protection */}
+      <div className="rounded-3xl border border-white/10 bg-zinc-900 p-6 backdrop-blur-xl">
+        <div className="mb-4 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-gray-400" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            Gateway Protection
+          </h3>
+        </div>
+
+        {gatewayInfoLoading && (
+          <p className="text-sm text-gray-400">Detecting gateway…</p>
+        )}
+
+        {gatewayInfoError && !gatewayInfoLoading && (
+          <p className="text-sm text-amber-300">{gatewayInfoError}</p>
+        )}
+
+        {gatewayInfo && !gatewayInfoLoading && (
+          (() => {
+            const gwLock = gatewayLocks.find(
+              (l) => l.gateway_ip === gatewayInfo.ip
+            );
+            const isPinned = gwLock?.is_locked ?? false;
+
+            return (
+              <div
+                className={`rounded-xl border p-3 ${
+                  isPinned
+                    ? "border-white/25 bg-white/[0.06]"
+                    : "border-white/10 bg-zinc-800"
+                }`}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Router className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-300">
+                      {gatewayInfo.ip}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      via {gatewayInfo.interfaceAlias}
+                    </span>
+                  </div>
+                  {isPinned && (
+                    <span className="flex items-center gap-1 rounded bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                      <Lock className="h-2.5 w-2.5" />
+                      Pinned
+                    </span>
+                  )}
+                </div>
+                <p className="mb-3 font-mono text-xs text-gray-400">
+                  {gatewayInfo.macAddress ?? "unresolved"}
+                  {isPinned &&
+                    gwLock &&
+                    gatewayInfo.macAddress &&
+                    gwLock.locked_mac !== gatewayInfo.macAddress && (
+                      <span className="ml-2 text-red-400">
+                        (should be {gwLock.locked_mac}!)
+                      </span>
+                    )}
+                </p>
+                <button
+                  disabled={
+                    pinningGateway ||
+                    isPending ||
+                    (!isPinned && !gatewayInfo.macAddress)
+                  }
+                  onClick={() => handlePinToggle(isPinned)}
+                  className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
+                    isPinned
+                      ? "border border-white/15 text-gray-300 hover:bg-white/10"
+                      : "bg-emerald-700 text-white hover:bg-emerald-600"
+                  }`}
+                >
+                  {isPinned ? (
+                    <Unlock className="h-3.5 w-3.5" />
+                  ) : (
+                    <Lock className="h-3.5 w-3.5" />
+                  )}
+                  {pinningGateway
+                    ? "Working…"
+                    : isPinned
+                      ? "Unpin"
+                      : "Pin Gateway MAC"}
+                </button>
+              </div>
+            );
+          })()
+        )}
+
+        <p className="mt-3 text-xs text-gray-500">
+          Pinning the gateway makes this machine reject any ARP reply that
+          tries to claim a different MAC for it — the standard defense
+          against ARP spoofing aimed at your router.
+        </p>
+
+        {pinError && <p className="mt-2 text-xs text-red-400">{pinError}</p>}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-white/10 bg-zinc-900 p-6 backdrop-blur-xl">

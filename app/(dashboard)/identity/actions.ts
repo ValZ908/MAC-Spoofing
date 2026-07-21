@@ -8,15 +8,30 @@ import {
   setAdapterMacAddress,
 } from "@/lib/network/windows-adapter";
 import {
+  getDefaultGateway,
+  pinGatewayMac,
+  unpinGatewayMac,
+} from "@/lib/network/gateway-guard";
+import {
   clearMacRotationLog,
   getAdapterLock,
+  getGatewayLock,
   insertMacRotationLog,
   listAdapterLocks,
+  listGatewayLocks,
   listMacRotationLog,
   setAdapterUnlocked,
+  setGatewayUnlocked,
   upsertAdapterLock,
+  upsertGatewayLock,
 } from "@/lib/db/queries";
-import type { AdapterLock, MacRotationLogEntry, NetworkAdapter } from "@/lib/types";
+import type {
+  AdapterLock,
+  GatewayInfo,
+  GatewayLock,
+  MacRotationLogEntry,
+  NetworkAdapter,
+} from "@/lib/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -35,11 +50,77 @@ export async function getAdapters(): Promise<
 export async function getIdentityData(): Promise<{
   log: MacRotationLogEntry[];
   locks: AdapterLock[];
+  gatewayLocks: GatewayLock[];
 }> {
   return {
     log: listMacRotationLog(20),
     locks: listAdapterLocks(),
+    gatewayLocks: listGatewayLocks(),
   };
+}
+
+export async function getGatewayInfo(): Promise<
+  { success: true; gateway: GatewayInfo } | { success: false; error: string }
+> {
+  try {
+    const gateway = await getDefaultGateway();
+    if (!gateway) {
+      return { success: false, error: "Could not determine the default gateway." };
+    }
+    return { success: true, gateway };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+export async function pinGateway(): Promise<ActionResult> {
+  const gateway = await getDefaultGateway();
+  if (!gateway) {
+    return { success: false, error: "Could not determine the default gateway." };
+  }
+  if (!gateway.macAddress) {
+    return {
+      success: false,
+      error:
+        "Could not resolve the gateway's MAC address. Make sure you're connected to a network.",
+    };
+  }
+
+  const result = await pinGatewayMac(
+    gateway.interfaceAlias,
+    gateway.ip,
+    gateway.macAddress
+  );
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+
+  upsertGatewayLock({
+    gateway_ip: gateway.ip,
+    interface_alias: gateway.interfaceAlias,
+    locked_mac: gateway.macAddress,
+    is_locked: true,
+  });
+
+  revalidatePath("/identity");
+  return { success: true };
+}
+
+export async function unpinGateway(gatewayIp: string): Promise<ActionResult> {
+  const lock = getGatewayLock(gatewayIp);
+  if (!lock) {
+    return { success: false, error: "Gateway lock not found." };
+  }
+
+  const result = await unpinGatewayMac(lock.interface_alias, gatewayIp);
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+
+  setGatewayUnlocked(gatewayIp);
+  revalidatePath("/identity");
+  return { success: true };
 }
 
 export async function lockAdapter(adapterName: string): Promise<ActionResult> {

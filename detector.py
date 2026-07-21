@@ -177,7 +177,15 @@ def check_arp_poisoning(
 
 
 def process_packet(packet) -> None:
-    if not (packet.haslayer(ARP) and packet[ARP].op == 2):
+    # Process both ARP request (op 1) and reply (op 2). On Wi-Fi, a station
+    # normally only receives frames addressed to itself plus broadcast/
+    # multicast traffic — it does NOT see unicast frames exchanged between
+    # two other devices unless the adapter is in monitor mode. ARP requests
+    # are broadcast ("who has X? tell Y"), so they're visible from any
+    # device on the network; ARP replies are usually unicast straight to
+    # the requester, so we'd only see those addressed to us. Handling
+    # requests too is what lets other devices (e.g. a tablet) show up.
+    if not (packet.haslayer(ARP) and packet[ARP].op in (1, 2)):
         return
 
     ip = packet[ARP].psrc

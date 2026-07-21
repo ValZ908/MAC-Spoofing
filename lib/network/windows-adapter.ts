@@ -4,7 +4,7 @@ import type { NetworkAdapter } from "@/lib/types";
 
 const execFileAsync = promisify(execFile);
 
-function escapePowerShellSingleQuoted(value: string): string {
+export function escapePowerShellSingleQuoted(value: string): string {
   return value.replace(/'/g, "''");
 }
 
@@ -17,11 +17,14 @@ function sleep(ms: number): Promise<void> {
 // before the caller tries to reach anything over the network (e.g. Supabase).
 const POST_RESTART_SETTLE_MS = 5000;
 
-async function runPowerShell(script: string): Promise<string> {
+export async function runPowerShell(
+  script: string,
+  timeoutMs = 20_000
+): Promise<string> {
   const { stdout } = await execFileAsync(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-Command", script],
-    { windowsHide: true, maxBuffer: 1024 * 1024 }
+    { windowsHide: true, maxBuffer: 1024 * 1024, timeout: timeoutMs }
   );
   return stdout;
 }

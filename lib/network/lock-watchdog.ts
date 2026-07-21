@@ -1,12 +1,14 @@
 import {
   insertMacRotationLog,
   listAdapterLocks,
+  listGatewayLocks,
 } from "@/lib/db/queries";
 import {
   listNetworkAdapters,
   resetAdapterToHardwareMac,
 } from "./windows-adapter";
-import type { AdapterLock } from "@/lib/types";
+import { getNeighborState, pinGatewayMac } from "./gateway-guard";
+import type { AdapterLock, GatewayLock } from "@/lib/types";
 
 const CHECK_INTERVAL_MS = 15_000;
 
@@ -23,6 +25,9 @@ export function startAdapterLockWatchdog() {
   setInterval(() => {
     checkLockedAdapters().catch((err) => {
       console.error("[adapter-lock-watchdog] check failed:", err);
+    });
+    checkGatewayLocks().catch((err) => {
+      console.error("[gateway-lock-watchdog] check failed:", err);
     });
   }, CHECK_INTERVAL_MS);
 
@@ -70,6 +75,65 @@ async function checkLockedAdapters() {
           result.error
         );
       }
+    }
+  }
+}
+
+/**
+ * Verifies each pinned gateway still resolves to its locked MAC. Windows
+ * doesn't reliably keep reporting "Permanent" in Get-NetNeighbor's State
+ * for a persistent entry once it's been used a while (it can show as
+ * Reachable/Stale even though the persistent store entry is intact), so
+ * only the MAC itself is checked — that's what actually matters. A missing
+ * entry (no neighbor row at all) is re-applied silently since we can't
+ * tell whether that's tampering or just a benign cache clear; a genuine
+ * MAC mismatch is re-applied AND logged as an enforcement event.
+ */
+async function checkGatewayLocks() {
+  const locks = listGatewayLocks().filter((l: GatewayLock) => l.is_locked);
+  if (locks.length === 0) return;
+
+  for (const lock of locks) {
+    const neighbor = await getNeighborState(lock.gateway_ip);
+
+    if (neighbor.mac === lock.locked_mac) continue;
+
+    const wasTampered = neighbor.mac !== null;
+
+    console.warn(
+      wasTampered
+        ? `[gateway-lock-watchdog] Unauthorized MAC change on gateway ${lock.gateway_ip}: ` +
+            `${neighbor.mac} (expected ${lock.locked_mac}). Reverting...`
+        : `[gateway-lock-watchdog] Gateway pin missing for ${lock.gateway_ip}. Re-applying...`
+    );
+
+    const result = await pinGatewayMac(
+      lock.interface_alias,
+      lock.gateway_ip,
+      lock.locked_mac
+    );
+
+    if (wasTampered) {
+      try {
+        insertMacRotationLog({
+          adapter_name: `Gateway ${lock.gateway_ip}`,
+          previous_mac: neighbor.mac!,
+          new_mac: lock.locked_mac,
+          triggered_by: "lock_enforcement",
+        });
+      } catch (err) {
+        console.error(
+          `[gateway-lock-watchdog] Failed to log enforcement for ${lock.gateway_ip}:`,
+          err
+        );
+      }
+    }
+
+    if (!result.success) {
+      console.error(
+        `[gateway-lock-watchdog] Failed to re-pin ${lock.gateway_ip}:`,
+        result.error
+      );
     }
   }
 }

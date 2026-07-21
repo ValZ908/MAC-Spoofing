@@ -61,6 +61,15 @@ CREATE TABLE IF NOT EXISTS detector_heartbeat (
   hostname TEXT NOT NULL UNIQUE,
   last_seen TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gateway_locks (
+  id TEXT PRIMARY KEY,
+  gateway_ip TEXT NOT NULL UNIQUE,
+  interface_alias TEXT NOT NULL,
+  locked_mac TEXT NOT NULL,
+  is_locked INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL
+);
 `;
 
 type GlobalDb = { __macSpoofDb?: Database.Database };
