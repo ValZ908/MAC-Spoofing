@@ -15,7 +15,7 @@ import random
 from scapy.all import ARP, Ether, sendp
 
 # Change to an IP that already appears on the Devices page, for example:
-TARGET_IP = "10.42.211.127"
+TARGET_IP = "192.168.1.200"
 
 fake_mac = "de:ad:be:ef:%02x:%02x" % (
     random.randint(0, 255),

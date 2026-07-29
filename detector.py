@@ -190,6 +190,15 @@ def process_packet(packet) -> None:
 
     ip = packet[ARP].psrc
     mac = packet[ARP].hwsrc
+
+    # 0.0.0.0 is not a real device address — it's what a device sends as its
+    # own IP during an ARP probe (checking for address conflicts before it
+    # has a DHCP lease yet). Any number of unrelated devices can legitimately
+    # send this at the same time, which would otherwise look like "the same
+    # IP keeps changing MAC" and flood false alerts.
+    if ip == "0.0.0.0":
+        return
+
     now = datetime.now(timezone.utc)
 
     print(f"[INFO] Active device seen: IP {ip} -> MAC {mac}")
