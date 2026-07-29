@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS router_config (
   username TEXT NOT NULL DEFAULT '',
   password TEXT NOT NULL DEFAULT '',
   block_command_template TEXT NOT NULL DEFAULT 'iptables -A FORWARD -m mac --mac-source {mac} -j DROP',
-  spoof_window_seconds INTEGER NOT NULL DEFAULT 5
+  spoof_window_seconds INTEGER NOT NULL DEFAULT 2,
+  alert_cooldown_seconds INTEGER NOT NULL DEFAULT 300,
+  min_poisoning_ips INTEGER NOT NULL DEFAULT 3
 );
 
 CREATE TABLE IF NOT EXISTS mac_rotation_log (
@@ -93,14 +95,30 @@ function migrate(db: Database.Database) {
   db.exec(SCHEMA);
   ensureColumn(db, "alerts", "block_method", "TEXT");
 
+  const columns = db
+    .prepare("PRAGMA table_info(router_config)")
+    .all() as { name: string }[];
+  const names = new Set(columns.map((c) => c.name));
+  if (!names.has("alert_cooldown_seconds")) {
+    db.exec(
+      "ALTER TABLE router_config ADD COLUMN alert_cooldown_seconds INTEGER NOT NULL DEFAULT 300"
+    );
+  }
+  if (!names.has("min_poisoning_ips")) {
+    db.exec(
+      "ALTER TABLE router_config ADD COLUMN min_poisoning_ips INTEGER NOT NULL DEFAULT 3"
+    );
+  }
+
   const configCount = db
     .prepare("SELECT COUNT(*) AS c FROM router_config")
     .get() as { c: number };
   if (configCount.c === 0) {
     db.prepare(
       `INSERT INTO router_config
-        (id, router_ip, username, password, block_command_template, spoof_window_seconds)
-       VALUES (?, '', '', '', 'iptables -A FORWARD -m mac --mac-source {mac} -j DROP', 5)`
+        (id, router_ip, username, password, block_command_template,
+         spoof_window_seconds, alert_cooldown_seconds, min_poisoning_ips)
+       VALUES (?, '', '', '', 'iptables -A FORWARD -m mac --mac-source {mac} -j DROP', 2, 300, 3)`
     ).run(crypto.randomUUID());
   }
 }

@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
+import { evaluateAlert } from "@/lib/detection/alert-policy";
 import { blockMacOnRouter } from "@/lib/router/ssh-block";
 import { blockIpsLocally } from "@/lib/network/local-firewall";
-import {
-  getDeviceByMac,
-  getRouterConfig,
-  insertAlert,
-  markAlertBlocked,
-} from "@/lib/db/queries";
+import { getRouterConfig, insertAlert, markAlertBlocked } from "@/lib/db/queries";
+import type { AttackType } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -28,21 +25,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const alert = insertAlert({
-    attack_type: body.attack_type,
+  const candidate = {
+    attack_type: body.attack_type as AttackType,
     target_ip: body.target_ip,
     real_mac: body.real_mac,
     attacker_mac: body.attacker_mac,
-  });
+  };
 
-  const trusted = getDeviceByMac(body.attacker_mac);
-  if (trusted?.is_trusted) {
+  const decision = evaluateAlert(candidate);
+  if (!decision.accept) {
     return NextResponse.json({
-      alert,
+      suppressed: true,
+      reason: decision.reason,
       auto_blocked: false,
-      skipped_reason: "attacker_mac is a trusted device",
     });
   }
+
+  const alert = insertAlert(candidate);
 
   const config = getRouterConfig();
   let routerError: string | undefined;

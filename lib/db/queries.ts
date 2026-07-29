@@ -4,6 +4,7 @@ import type {
   Alert,
   AlertStatus,
   BlockMethod,
+  DetectionSettings,
   DetectorHeartbeat,
   Device,
   GatewayLock,
@@ -43,6 +44,8 @@ type RouterConfigRow = {
   password: string;
   block_command_template: string;
   spoof_window_seconds: number;
+  alert_cooldown_seconds: number;
+  min_poisoning_ips: number;
 };
 
 type LockRow = {
@@ -292,13 +295,85 @@ export function markAlertBlocked(id: string, method: BlockMethod): void {
     .run(method, id);
 }
 
+export function findRecentDuplicateAlert(
+  attackType: string,
+  attackerMac: string,
+  targetIp: string,
+  cooldownSeconds: number
+): boolean {
+  const cutoff = new Date(Date.now() - cooldownSeconds * 1000).toISOString();
+  const normalized = attackerMac.replaceAll("-", ":").toUpperCase();
+  const row = getDb()
+    .prepare(
+      `SELECT id FROM alerts
+       WHERE attack_type = ?
+         AND UPPER(REPLACE(attacker_mac, '-', ':')) = ?
+         AND target_ip = ?
+         AND created_at >= ?
+       LIMIT 1`
+    )
+    .get(attackType, normalized, targetIp, cutoff) as { id: string } | undefined;
+  return Boolean(row);
+}
+
 // --- Router config ---
 
 export function getRouterConfig(): RouterConfig {
   const row = getDb()
     .prepare("SELECT * FROM router_config LIMIT 1")
     .get() as RouterConfigRow;
-  return row;
+  return {
+    ...row,
+    alert_cooldown_seconds: row.alert_cooldown_seconds ?? 300,
+    min_poisoning_ips: row.min_poisoning_ips ?? 3,
+  };
+}
+
+export function listGatewayIps(): string[] {
+  const ips = new Set<string>();
+  const config = getRouterConfig();
+  if (config.router_ip) ips.add(config.router_ip);
+
+  const locks = getDb()
+    .prepare(
+      "SELECT gateway_ip FROM gateway_locks WHERE is_locked = 1"
+    )
+    .all() as { gateway_ip: string }[];
+  for (const lock of locks) ips.add(lock.gateway_ip);
+  return [...ips];
+}
+
+export function listGatewayMacs(): string[] {
+  const macs = new Set<string>();
+  const locks = getDb()
+    .prepare(
+      "SELECT locked_mac FROM gateway_locks WHERE is_locked = 1"
+    )
+    .all() as { locked_mac: string }[];
+  for (const lock of locks) {
+    macs.add(lock.locked_mac.replaceAll("-", ":").toUpperCase());
+  }
+  return [...macs];
+}
+
+export function isGatewayIp(ip: string): boolean {
+  return listGatewayIps().includes(ip);
+}
+
+export function isGatewayMac(mac: string): boolean {
+  const normalized = mac.replaceAll("-", ":").toUpperCase();
+  return listGatewayMacs().includes(normalized);
+}
+
+export function getDetectionSettings(): DetectionSettings {
+  const config = getRouterConfig();
+  return {
+    spoof_window_seconds: config.spoof_window_seconds,
+    alert_cooldown_seconds: config.alert_cooldown_seconds,
+    min_poisoning_ips: config.min_poisoning_ips,
+    gateway_ips: listGatewayIps(),
+    gateway_macs: listGatewayMacs(),
+  };
 }
 
 export function updateRouterConfig(input: {
@@ -307,13 +382,16 @@ export function updateRouterConfig(input: {
   password: string;
   block_command_template: string;
   spoof_window_seconds: number;
+  alert_cooldown_seconds: number;
+  min_poisoning_ips: number;
 }): void {
   const existing = getRouterConfig();
   getDb()
     .prepare(
       `UPDATE router_config
        SET router_ip = ?, username = ?, password = ?,
-           block_command_template = ?, spoof_window_seconds = ?
+           block_command_template = ?, spoof_window_seconds = ?,
+           alert_cooldown_seconds = ?, min_poisoning_ips = ?
        WHERE id = ?`
     )
     .run(
@@ -322,6 +400,8 @@ export function updateRouterConfig(input: {
       input.password,
       input.block_command_template,
       input.spoof_window_seconds,
+      input.alert_cooldown_seconds,
+      input.min_poisoning_ips,
       existing.id
     );
 }

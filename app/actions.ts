@@ -106,8 +106,12 @@ export async function saveRouterConfig(
     formData.get("block_command_template") ?? ""
   );
   const spoof_window_seconds = Number(
-    formData.get("spoof_window_seconds") ?? 5
+    formData.get("spoof_window_seconds") ?? 2
   );
+  const alert_cooldown_seconds = Number(
+    formData.get("alert_cooldown_seconds") ?? 300
+  );
+  const min_poisoning_ips = Number(formData.get("min_poisoning_ips") ?? 3);
 
   updateRouterConfig({
     router_ip,
@@ -116,7 +120,13 @@ export async function saveRouterConfig(
     block_command_template,
     spoof_window_seconds: Number.isFinite(spoof_window_seconds)
       ? spoof_window_seconds
-      : 5,
+      : 2,
+    alert_cooldown_seconds: Number.isFinite(alert_cooldown_seconds)
+      ? alert_cooldown_seconds
+      : 300,
+    min_poisoning_ips: Number.isFinite(min_poisoning_ips)
+      ? min_poisoning_ips
+      : 3,
   });
 
   revalidatePath("/settings");

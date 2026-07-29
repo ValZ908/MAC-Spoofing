@@ -118,14 +118,44 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
 
         <FormField
           icon={Timer}
-          label="Sensitivity (seconds)"
-          hint="Maximum time window for a sudden IP→MAC change to be flagged as spoofing."
+          label="Spoof window (seconds)"
+          hint="Only flag IP→MAC changes faster than this. Lower = stricter, fewer slow DHCP false alarms."
         >
           <input
             name="spoof_window_seconds"
             type="number"
             min={1}
-            defaultValue={config?.spoof_window_seconds ?? 5}
+            max={30}
+            defaultValue={config?.spoof_window_seconds ?? 2}
+            className={inputClassName}
+          />
+        </FormField>
+
+        <FormField
+          icon={Timer}
+          label="Alert cooldown (seconds)"
+          hint="Suppress duplicate alerts for the same attacker within this period."
+        >
+          <input
+            name="alert_cooldown_seconds"
+            type="number"
+            min={30}
+            defaultValue={config?.alert_cooldown_seconds ?? 300}
+            className={inputClassName}
+          />
+        </FormField>
+
+        <FormField
+          icon={Timer}
+          label="Min IPs for ARP poisoning"
+          hint="One MAC must claim at least this many non-gateway IPs before alerting. Higher = stricter."
+        >
+          <input
+            name="min_poisoning_ips"
+            type="number"
+            min={2}
+            max={10}
+            defaultValue={config?.min_poisoning_ips ?? 3}
             className={inputClassName}
           />
         </FormField>
