@@ -75,7 +75,7 @@ export async function getGatewayInfo(): Promise<
 }
 
 export async function pinGateway(): Promise<ActionResult> {
-  const gateway = await getDefaultGateway();
+  const gateway = await getDefaultGateway({ forceRefresh: true });
   if (!gateway) {
     return { success: false, error: "Could not determine the default gateway." };
   }

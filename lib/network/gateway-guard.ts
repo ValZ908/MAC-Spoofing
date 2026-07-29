@@ -22,46 +22,81 @@ function toGatewayCommandError(err: unknown): GatewayCommandResult {
   return { success: false, error: message };
 }
 
-type RawRoute = {
+type RawGatewayResult = {
   NextHop: string;
   InterfaceAlias: string;
+  Mac: string | null;
 };
+
+// Spawning powershell.exe is already the dominant cost, but on some machines
+// the NetTCPIP module itself takes several seconds to import cold inside a
+// fresh process — unavoidable per-call since each invocation is a brand new
+// process. Cache the result briefly so repeat page visits (e.g. clicking
+// back to Identity during a demo) come back instantly instead of re-paying
+// that cost every time.
+const GATEWAY_CACHE_TTL_MS = 20_000;
+let gatewayCache: { data: GatewayInfo | null; expiresAt: number } | null = null;
 
 /**
  * Finds the machine's current default gateway IP and the interface it's
- * reached through, then resolves the gateway's current MAC address (pinging
- * it first in case there's no existing ARP/neighbor entry yet).
+ * reached through, then resolves the gateway's current MAC address. Runs as
+ * a single PowerShell invocation (spawning powershell.exe is the slow part —
+ * every extra call costs another cold-start), and only pings the gateway as
+ * a last resort if there's no ARP/neighbor entry cached yet. Once the
+ * gateway is pinned (permanent ARP entry), this fast path makes every later
+ * load near-instant.
+ *
+ * Pass forceRefresh for security-sensitive callers (e.g. pinning) that must
+ * act on current truth rather than a cached snapshot.
  */
-export async function getDefaultGateway(): Promise<GatewayInfo | null> {
-  const routeStdout = await runPowerShell(
-    "Get-NetRoute -DestinationPrefix '0.0.0.0/0' | " +
-      "Sort-Object -Property RouteMetric | " +
-      "Select-Object -First 1 NextHop, InterfaceAlias | ConvertTo-Json -Compress"
-  );
+export async function getDefaultGateway(
+  options?: { forceRefresh?: boolean }
+): Promise<GatewayInfo | null> {
+  if (
+    !options?.forceRefresh &&
+    gatewayCache &&
+    Date.now() < gatewayCache.expiresAt
+  ) {
+    return gatewayCache.data;
+  }
 
-  const trimmed = routeStdout.trim();
-  if (!trimmed) return null;
-
-  const route: RawRoute = JSON.parse(trimmed);
-  if (!route?.NextHop) return null;
-
-  const safeIp = escapePowerShellSingleQuoted(route.NextHop);
-  const macStdout = await runPowerShell(
-    `Test-Connection -ComputerName '${safeIp}' -Count 1 -Quiet -ErrorAction SilentlyContinue | Out-Null; ` +
-      `Start-Sleep -Milliseconds 300; ` +
-      `(Get-NetNeighbor -IPAddress '${safeIp}' -ErrorAction SilentlyContinue | ` +
+  const stdout = await runPowerShell(
+    `$route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | ` +
+      `Sort-Object -Property RouteMetric | Select-Object -First 1 NextHop, InterfaceAlias; ` +
+      `if (-not $route) { '{}'; exit }; ` +
+      `$ip = $route.NextHop; ` +
+      `$mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
       `Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
-      `Select-Object -First 1 -ExpandProperty LinkLayerAddress)`,
+      `Select-Object -First 1 -ExpandProperty LinkLayerAddress); ` +
+      `if (-not $mac) { ` +
+      `Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue | Out-Null; ` +
+      `Start-Sleep -Milliseconds 300; ` +
+      `$mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
+      `Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
+      `Select-Object -First 1 -ExpandProperty LinkLayerAddress) }; ` +
+      `[PSCustomObject]@{ NextHop = $ip; InterfaceAlias = $route.InterfaceAlias; Mac = $mac } | ConvertTo-Json -Compress`,
     10_000
   );
 
-  const mac = macStdout.trim();
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    gatewayCache = { data: null, expiresAt: Date.now() + GATEWAY_CACHE_TTL_MS };
+    return null;
+  }
 
-  return {
-    ip: route.NextHop,
-    interfaceAlias: route.InterfaceAlias,
-    macAddress: mac ? mac.replaceAll("-", ":") : null,
+  const result: RawGatewayResult = JSON.parse(trimmed);
+  if (!result?.NextHop) {
+    gatewayCache = { data: null, expiresAt: Date.now() + GATEWAY_CACHE_TTL_MS };
+    return null;
+  }
+
+  const gateway: GatewayInfo = {
+    ip: result.NextHop,
+    interfaceAlias: result.InterfaceAlias,
+    macAddress: result.Mac ? result.Mac.replaceAll("-", ":") : null,
   };
+  gatewayCache = { data: gateway, expiresAt: Date.now() + GATEWAY_CACHE_TTL_MS };
+  return gateway;
 }
 
 /**

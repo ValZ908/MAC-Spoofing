@@ -132,7 +132,7 @@ export function IdentityClient({
 
     const interval = setInterval(() => {
       void refreshIdentityData();
-    }, 5_000);
+    }, 2_000);
 
     return () => {
       cancelled = true;

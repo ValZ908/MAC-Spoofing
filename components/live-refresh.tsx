@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /** Soft-refresh this server page every few seconds so detector updates appear. */
-export function LiveRefresh({ intervalMs = 5_000 }: { intervalMs?: number }) {
+export function LiveRefresh({ intervalMs = 2_000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {

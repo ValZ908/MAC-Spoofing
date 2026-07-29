@@ -25,6 +25,12 @@ export async function blockIpsLocally(ips: string[]): Promise<BlockResult> {
     return { success: false, error: "No valid IP address to block locally." };
   }
 
+  // Two block calls can land for the same IP within milliseconds (a spoof
+  // test/attack typically fires a mismatch alert in each direction). Create
+  // with -ErrorAction Stop inside try/catch and swallow only "already
+  // exists" races, so a concurrent call creating the same rule name doesn't
+  // surface as a false failure — while real errors (e.g. access denied)
+  // still propagate.
   const script = validIps
     .map((ip) => {
       const safeIp = escapePowerShellSingleQuoted(ip);
@@ -32,9 +38,11 @@ export async function blockIpsLocally(ips: string[]): Promise<BlockResult> {
       const outName = escapePowerShellSingleQuoted(`MacSpoof-Block-${ip}-Out`);
       return (
         `if (-not (Get-NetFirewallRule -DisplayName '${inName}' -ErrorAction SilentlyContinue)) { ` +
-        `New-NetFirewallRule -DisplayName '${inName}' -Direction Inbound -RemoteAddress '${safeIp}' -Action Block | Out-Null }; ` +
+        `try { New-NetFirewallRule -DisplayName '${inName}' -Direction Inbound -RemoteAddress '${safeIp}' -Action Block -ErrorAction Stop | Out-Null } ` +
+        `catch { if ($_.Exception.Message -notmatch 'already exists') { throw } } }; ` +
         `if (-not (Get-NetFirewallRule -DisplayName '${outName}' -ErrorAction SilentlyContinue)) { ` +
-        `New-NetFirewallRule -DisplayName '${outName}' -Direction Outbound -RemoteAddress '${safeIp}' -Action Block | Out-Null }`
+        `try { New-NetFirewallRule -DisplayName '${outName}' -Direction Outbound -RemoteAddress '${safeIp}' -Action Block -ErrorAction Stop | Out-Null } ` +
+        `catch { if ($_.Exception.Message -notmatch 'already exists') { throw } } }`
       );
     })
     .join("; ");

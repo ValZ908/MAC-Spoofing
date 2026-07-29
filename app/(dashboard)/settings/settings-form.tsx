@@ -1,15 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  Router,
-  User,
-  Lock,
-  Terminal,
-  Timer,
-  CheckCircle2,
-  Save,
-} from "lucide-react";
+import { Terminal, Timer, CheckCircle2, Save } from "lucide-react";
 import { saveRouterConfig } from "@/app/actions";
 import type { RouterConfig } from "@/lib/types";
 
@@ -65,40 +57,6 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
       action={handleSubmit}
       className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8"
     >
-      <div className="flex flex-col gap-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Router Connection
-        </p>
-
-        <FormField icon={Router} label="Router IP Address">
-          <input
-            name="router_ip"
-            defaultValue={config?.router_ip ?? ""}
-            placeholder="192.168.1.1"
-            className={inputClassName}
-          />
-        </FormField>
-
-        <FormField icon={User} label="Router Username">
-          <input
-            name="username"
-            defaultValue={config?.username ?? ""}
-            className={inputClassName}
-          />
-        </FormField>
-
-        <FormField icon={Lock} label="Router Password">
-          <input
-            name="password"
-            type="password"
-            defaultValue={config?.password ?? ""}
-            className={inputClassName}
-          />
-        </FormField>
-      </div>
-
-      <div className="my-6 border-t border-white/10" />
-
       <div className="flex flex-col gap-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Detection Behavior
