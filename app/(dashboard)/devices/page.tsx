@@ -10,16 +10,16 @@ export default async function DevicesPage() {
     <div className="flex flex-col gap-4">
       <LiveRefresh />
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Connected Devices</h1>
-        <p className="mt-1 text-sm text-gray-400">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Connected Devices</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Every device detector.py has seen on the network. Mark the ones you recognize as
           Trusted so unknown devices stand out.
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto rounded-2xl border border-border shadow-sm">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-zinc-900 text-gray-400">
+          <thead className="bg-muted text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">IP Address</th>
               <th className="px-4 py-3 font-medium">MAC Address</th>
@@ -29,11 +29,11 @@ export default async function DevicesPage() {
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10 bg-zinc-900">
+          <tbody className="divide-y divide-border bg-card">
             {rows.map((device) => (
-              <tr key={device.id} className="text-gray-300 transition hover:bg-white/10">
+              <tr key={device.id} className="text-foreground transition hover:bg-muted">
                 <td className="px-4 py-3">{device.ip_address ?? "-"}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                   {device.mac_address}
                 </td>
                 <td className="px-4 py-3">{device.vendor ?? "-"}</td>
@@ -54,7 +54,7 @@ export default async function DevicesPage() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                   No devices detected yet.
                 </td>
               </tr>
