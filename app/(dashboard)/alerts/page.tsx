@@ -64,7 +64,11 @@ export default async function AlertsPage() {
                     {alert.status === "unhandled"
                       ? "Unhandled"
                       : alert.status === "blocked"
-                        ? "Blocked"
+                        ? alert.block_method === "local_firewall"
+                          ? "Blocked (Local Firewall)"
+                          : alert.block_method === "router"
+                            ? "Blocked (Router)"
+                            : "Blocked"
                         : "Ignored"}
                   </Badge>
                 </td>

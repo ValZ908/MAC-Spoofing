@@ -12,7 +12,7 @@ export function AlertRowActions({ alert }: { alert: Alert }) {
   function handleBlock() {
     setError(null);
     startTransition(async () => {
-      const result = await blockAttacker(alert.id, alert.attacker_mac);
+      const result = await blockAttacker(alert.id);
       if (!result.success) setError(result.error);
     });
   }

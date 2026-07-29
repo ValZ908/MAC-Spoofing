@@ -16,6 +16,8 @@ export type AlertStatus = "unhandled" | "blocked" | "ignored";
 
 export type AttackType = "ip_mac_mismatch" | "arp_poisoning";
 
+export type BlockMethod = "router" | "local_firewall";
+
 export type Alert = {
   id: string;
   created_at: string;
@@ -24,6 +26,7 @@ export type Alert = {
   real_mac: string;
   attacker_mac: string;
   status: AlertStatus;
+  block_method: BlockMethod | null;
   device_id: string | null;
 };
 

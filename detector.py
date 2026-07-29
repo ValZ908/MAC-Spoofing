@@ -118,7 +118,15 @@ def raise_alert(
         payload = response.json()
         print("[DATABASE] Alert logged via local dashboard API.")
         if payload.get("auto_blocked"):
-            print(f"[BLOCK] MAC {attacker_mac} auto-blocked on the router.\n")
+            method = payload.get("block_method")
+            where = (
+                "on the router"
+                if method == "router"
+                else "via local Windows Firewall"
+                if method == "local_firewall"
+                else "automatically"
+            )
+            print(f"[BLOCK] MAC {attacker_mac} auto-blocked {where}.\n")
         else:
             reason = payload.get("skipped_reason") or "unknown"
             print(f"[INFO] Auto-block skipped: {reason}\n")

@@ -2,9 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { blockMacOnRouter } from "@/lib/router/ssh-block";
+import { blockIpsLocally } from "@/lib/network/local-firewall";
 import {
+  getAlertById,
   getDeviceById,
   getRouterConfig,
+  markAlertBlocked,
   setDeviceStatus,
   setDeviceTrusted,
   updateAlertStatus,
@@ -45,25 +48,42 @@ export async function disconnectDevice(deviceId: string): Promise<ActionResult> 
   return { success: true };
 }
 
-export async function blockAttacker(
-  alertId: string,
-  attackerMac: string
-): Promise<ActionResult> {
-  const config = getRouterConfig();
+export async function blockAttacker(alertId: string): Promise<ActionResult> {
+  const alert = getAlertById(alertId);
+  if (!alert) {
+    return { success: false, error: "Alert not found." };
+  }
 
-  if (!config.router_ip) {
+  const config = getRouterConfig();
+  let routerError: string | undefined;
+
+  if (config.router_ip) {
+    const result = await blockMacOnRouter(config, alert.attacker_mac);
+    if (result.success) {
+      markAlertBlocked(alertId, "router");
+      revalidatePath("/alerts");
+      revalidatePath("/");
+      return { success: true };
+    }
+    routerError = result.error;
+  }
+
+  // Router blocking unavailable or failed (e.g. stock ISP/mesh routers like
+  // Telkomsel Orbit don't expose SSH) — fall back to blocking the attacker's
+  // IP locally via Windows Firewall. Only protects this machine, but works
+  // regardless of router make/model.
+  const targetIps = alert.target_ip.split(",").map((ip) => ip.trim());
+  const localResult = await blockIpsLocally(targetIps);
+  if (!localResult.success) {
     return {
       success: false,
-      error: "Router IP is not configured yet. Set it up in Settings first.",
+      error: routerError
+        ? `Router block failed (${routerError}); local firewall block also failed: ${localResult.error}`
+        : localResult.error,
     };
   }
 
-  const result = await blockMacOnRouter(config, attackerMac);
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-
-  updateAlertStatus(alertId, "blocked");
+  markAlertBlocked(alertId, "local_firewall");
   revalidatePath("/alerts");
   revalidatePath("/");
   return { success: true };

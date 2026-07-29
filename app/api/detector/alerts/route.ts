@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { blockMacOnRouter } from "@/lib/router/ssh-block";
+import { blockIpsLocally } from "@/lib/network/local-firewall";
 import {
   getDeviceByMac,
   getRouterConfig,
   insertAlert,
-  updateAlertStatus,
+  markAlertBlocked,
 } from "@/lib/db/queries";
 
 export const runtime = "nodejs";
@@ -44,26 +45,44 @@ export async function POST(request: Request) {
   }
 
   const config = getRouterConfig();
-  if (!config.router_ip) {
-    return NextResponse.json({
-      alert,
-      auto_blocked: false,
-      skipped_reason: "router not configured",
-    });
+  let routerError: string | undefined;
+
+  if (config.router_ip) {
+    const result = await blockMacOnRouter(config, body.attacker_mac);
+    if (result.success) {
+      markAlertBlocked(alert.id, "router");
+      return NextResponse.json({
+        alert: { ...alert, status: "blocked" as const, block_method: "router" },
+        auto_blocked: true,
+        block_method: "router",
+      });
+    }
+    routerError = result.error;
   }
 
-  const result = await blockMacOnRouter(config, body.attacker_mac);
-  if (result.success) {
-    updateAlertStatus(alert.id, "blocked");
+  // Router blocking unavailable or failed (e.g. stock ISP/mesh routers like
+  // Telkomsel Orbit don't expose SSH) — fall back to blocking the attacker's
+  // IP(s) locally via Windows Firewall.
+  const targetIps = body.target_ip.split(",").map((ip) => ip.trim());
+  const localResult = await blockIpsLocally(targetIps);
+  if (localResult.success) {
+    markAlertBlocked(alert.id, "local_firewall");
     return NextResponse.json({
-      alert: { ...alert, status: "blocked" as const },
+      alert: {
+        ...alert,
+        status: "blocked" as const,
+        block_method: "local_firewall",
+      },
       auto_blocked: true,
+      block_method: "local_firewall",
     });
   }
 
   return NextResponse.json({
     alert,
     auto_blocked: false,
-    skipped_reason: result.error,
+    skipped_reason: routerError
+      ? `router: ${routerError}; local firewall: ${localResult.error}`
+      : localResult.error,
   });
 }

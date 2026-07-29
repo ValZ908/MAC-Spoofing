@@ -3,6 +3,7 @@ import type {
   AdapterLock,
   Alert,
   AlertStatus,
+  BlockMethod,
   DetectorHeartbeat,
   Device,
   GatewayLock,
@@ -31,6 +32,7 @@ type AlertRow = {
   real_mac: string;
   attacker_mac: string;
   status: AlertStatus;
+  block_method: BlockMethod | null;
   device_id: string | null;
 };
 
@@ -91,6 +93,7 @@ function mapAlert(row: AlertRow): Alert {
     real_mac: row.real_mac,
     attacker_mac: row.attacker_mac,
     status: row.status,
+    block_method: row.block_method,
     device_id: row.device_id,
   };
 }
@@ -265,14 +268,28 @@ export function insertAlert(input: {
     real_mac: input.real_mac,
     attacker_mac: input.attacker_mac,
     status: "unhandled",
+    block_method: null,
     device_id: null,
   };
+}
+
+export function getAlertById(id: string): Alert | null {
+  const row = getDb()
+    .prepare("SELECT * FROM alerts WHERE id = ?")
+    .get(id) as AlertRow | undefined;
+  return row ? mapAlert(row) : null;
 }
 
 export function updateAlertStatus(id: string, status: AlertStatus): void {
   getDb()
     .prepare("UPDATE alerts SET status = ? WHERE id = ?")
     .run(status, id);
+}
+
+export function markAlertBlocked(id: string, method: BlockMethod): void {
+  getDb()
+    .prepare("UPDATE alerts SET status = 'blocked', block_method = ? WHERE id = ?")
+    .run(method, id);
 }
 
 // --- Router config ---

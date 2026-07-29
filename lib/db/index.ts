@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   real_mac TEXT NOT NULL,
   attacker_mac TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'unhandled' CHECK (status IN ('unhandled', 'blocked', 'ignored')),
+  block_method TEXT CHECK (block_method IN ('router', 'local_firewall')),
   device_id TEXT REFERENCES devices(id) ON DELETE SET NULL
 );
 
@@ -74,8 +75,23 @@ CREATE TABLE IF NOT EXISTS gateway_locks (
 
 type GlobalDb = { __macSpoofDb?: Database.Database };
 
+function ensureColumn(
+  db: Database.Database,
+  table: string,
+  column: string,
+  definition: string
+) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as {
+    name: string;
+  }[];
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 function migrate(db: Database.Database) {
   db.exec(SCHEMA);
+  ensureColumn(db, "alerts", "block_method", "TEXT");
 
   const configCount = db
     .prepare("SELECT COUNT(*) AS c FROM router_config")
