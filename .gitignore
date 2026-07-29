@@ -30,8 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (optional; app runs without them)
-.env*
 
 # local SQLite database
 /data/

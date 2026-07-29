@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 type BadgeVariant = "success" | "danger" | "neutral" | "warning";
 
 const variantClasses: Record<BadgeVariant, string> = {
-  success: "bg-white/10 text-white ring-white/20",
-  danger: "bg-red-500/10 text-red-400 ring-red-500/20",
-  warning: "bg-amber-500/10 text-amber-400 ring-amber-500/20",
-  neutral: "bg-white/10 text-gray-300 ring-white/20",
+  success: "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30",
+  danger: "bg-foreground text-background ring-foreground",
+  warning: "bg-muted text-foreground ring-border font-semibold",
+  neutral: "bg-white/5 text-muted-foreground ring-white/10",
 };
 
 export function Badge({
