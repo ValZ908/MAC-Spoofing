@@ -40,6 +40,16 @@ export type RouterConfig = {
   password: string;
   block_command_template: string;
   spoof_window_seconds: number;
+  alert_cooldown_seconds: number;
+  min_poisoning_ips: number;
+};
+
+export type DetectionSettings = Pick<
+  RouterConfig,
+  "spoof_window_seconds" | "alert_cooldown_seconds" | "min_poisoning_ips"
+> & {
+  gateway_ips: string[];
+  gateway_macs: string[];
 };
 
 export type RotationPolicy = "manual" | "interval" | "network_change";

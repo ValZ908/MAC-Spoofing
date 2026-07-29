@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { evaluateAlert } from "@/lib/detection/alert-policy";
 import { blockMacOnRouter } from "@/lib/router/ssh-block";
 import {
   getDeviceByMac,
@@ -6,6 +7,7 @@ import {
   insertAlert,
   updateAlertStatus,
 } from "@/lib/db/queries";
+import type { AttackType } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -27,12 +29,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const alert = insertAlert({
-    attack_type: body.attack_type,
+  const candidate = {
+    attack_type: body.attack_type as AttackType,
     target_ip: body.target_ip,
     real_mac: body.real_mac,
     attacker_mac: body.attacker_mac,
-  });
+  };
+
+  const decision = evaluateAlert(candidate);
+  if (!decision.accept) {
+    return NextResponse.json({
+      suppressed: true,
+      reason: decision.reason,
+      auto_blocked: false,
+    });
+  }
+
+  const alert = insertAlert(candidate);
 
   const trusted = getDeviceByMac(body.attacker_mac);
   if (trusted?.is_trusted) {
