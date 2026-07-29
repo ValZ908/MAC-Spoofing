@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
+  isGatewayIp,
   markStaleDevicesDisconnected,
+  setDeviceTrusted,
   upsertDevice,
 } from "@/lib/db/queries";
 
@@ -27,6 +29,10 @@ export async function POST(request: Request) {
     ip_address: body.ip_address ?? null,
     vendor: body.vendor ?? null,
   });
+
+  if (body.ip_address && isGatewayIp(body.ip_address)) {
+    setDeviceTrusted(device.id, true);
+  }
 
   markStaleDevicesDisconnected(DEVICE_STALE_SECONDS);
 
