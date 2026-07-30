@@ -21,7 +21,7 @@ export function DeviceRowActions({ device }: { device: Device }) {
                 await trustDevice(device.id);
               })
             }
-            className="inline-flex items-center gap-1 rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-700 px-3 py-1 text-xs font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
           >
             <ShieldCheck className="h-3.5 w-3.5" />
             Trust
@@ -37,14 +37,14 @@ export function DeviceRowActions({ device }: { device: Device }) {
                 if (!result.success) setError(result.error);
               })
             }
-            className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md bg-red-800 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
           >
             <WifiOff className="h-3.5 w-3.5" />
             Disconnect
           </button>
         )}
       </div>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-red-400">{error}</span>}
     </div>
   );
 }

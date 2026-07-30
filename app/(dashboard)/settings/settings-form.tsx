@@ -1,55 +1,37 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Terminal, CheckCircle2, Save } from "lucide-react";
+import { Terminal, Timer, CheckCircle2, Save } from "lucide-react";
 import { saveRouterConfig } from "@/app/actions";
 import type { RouterConfig } from "@/lib/types";
 
-function GroupLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
-}
-
-function NumberRow({
-  name,
+function FormField({
+  icon: Icon,
   label,
   hint,
-  defaultValue,
-  min,
-  max,
-  suffix,
+  children,
 }: {
-  name: string;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  hint: string;
-  defaultValue: number;
-  min?: number;
-  max?: number;
-  suffix: string;
+  hint?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3.5 not-last:border-b border-border">
-      <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <input
-          name={name}
-          type="number"
-          min={min}
-          max={max}
-          defaultValue={defaultValue}
-          className="w-[72px] rounded-lg border border-input bg-background px-2 py-1.5 text-right text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
-        <span className="text-xs text-muted-foreground">{suffix}</span>
-      </div>
+    <div>
+      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+          <Icon className="h-4 w-4" />
+        </span>
+        {label}
+      </label>
+      {children}
+      {hint && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
+
+const inputClassName =
+  "w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-white focus:ring-2 focus:ring-white/10";
 
 export function SettingsForm({ config }: { config: RouterConfig | null }) {
   const [isPending, startTransition] = useTransition();
@@ -71,77 +53,90 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
   }
 
   return (
-    <form action={handleSubmit} className="w-full max-w-2xl">
-      <GroupLabel>Response</GroupLabel>
-      <div className="rounded-2xl border border-border bg-card px-5">
-        <div className="border-b border-border py-4">
-          <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-            Block command
-          </label>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Runs on your router over SSH. {"{mac}"} is replaced at run time.
-          </p>
+    <form
+      action={handleSubmit}
+      className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8"
+    >
+      <div className="flex flex-col gap-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          Detection Behavior
+        </p>
+
+        <FormField
+          icon={Terminal}
+          label="Block Command"
+          hint={`Use {mac} as a placeholder for the attacker's MAC address.`}
+        >
           <input
             name="block_command_template"
             defaultValue={config?.block_command_template ?? ""}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className={`${inputClassName} font-mono text-xs`}
           />
-        </div>
+        </FormField>
 
-        <NumberRow
-          name="alert_cooldown_seconds"
-          label="Alert cooldown"
-          hint="Suppress duplicate alerts for the same attacker."
-          defaultValue={config?.alert_cooldown_seconds ?? 300}
-          min={30}
-          suffix="sec"
-        />
-      </div>
-
-      <GroupLabel>
-        <span className="mt-5 block">Detection thresholds</span>
-      </GroupLabel>
-      <div className="rounded-2xl border border-border bg-card px-5">
-        <NumberRow
-          name="spoof_window_seconds"
-          label="Spoof window"
-          hint="Lower = stricter, fewer slow DHCP false alarms."
-          defaultValue={config?.spoof_window_seconds ?? 2}
-          min={1}
-          max={30}
-          suffix="sec"
-        />
-        <NumberRow
-          name="min_poisoning_ips"
-          label="Min IPs for ARP poisoning"
-          hint="Non-gateway IPs one MAC must claim first."
-          defaultValue={config?.min_poisoning_ips ?? 3}
-          min={2}
-          max={10}
-          suffix="IPs"
-        />
-      </div>
-
-      <div className="mt-5 flex items-center justify-end gap-3">
-        {status === "saved" && (
-          <p className="flex items-center gap-1.5 text-sm text-primary">
-            <CheckCircle2 className="h-4 w-4" />
-            Saved.
-          </p>
-        )}
-        {status === "error" && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
-        <button
-          type="submit"
-          disabled={isPending}
-          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+        <FormField
+          icon={Timer}
+          label="Spoof window (seconds)"
+          hint="Only flag IP→MAC changes faster than this. Lower = stricter, fewer slow DHCP false alarms."
         >
-          <Save className="h-4 w-4" />
-          {isPending ? "Saving…" : "Save settings"}
-        </button>
+          <input
+            name="spoof_window_seconds"
+            type="number"
+            min={1}
+            max={30}
+            defaultValue={config?.spoof_window_seconds ?? 2}
+            className={inputClassName}
+          />
+        </FormField>
+
+        <FormField
+          icon={Timer}
+          label="Alert cooldown (seconds)"
+          hint="Suppress duplicate alerts for the same attacker within this period."
+        >
+          <input
+            name="alert_cooldown_seconds"
+            type="number"
+            min={30}
+            defaultValue={config?.alert_cooldown_seconds ?? 300}
+            className={inputClassName}
+          />
+        </FormField>
+
+        <FormField
+          icon={Timer}
+          label="Min IPs for ARP poisoning"
+          hint="One MAC must claim at least this many non-gateway IPs before alerting. Higher = stricter."
+        >
+          <input
+            name="min_poisoning_ips"
+            type="number"
+            min={2}
+            max={10}
+            defaultValue={config?.min_poisoning_ips ?? 3}
+            className={inputClassName}
+          />
+        </FormField>
       </div>
+
+      <button
+        type="submit"
+        disabled={isPending}
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-medium text-black transition-all hover:tracking-[0.15em] hover:bg-zinc-200 disabled:opacity-50"
+      >
+        <Save className="h-4 w-4" />
+        Save Settings
+      </button>
+
+      {status === "saved" && (
+        <p className="mt-3 flex items-center gap-1.5 text-sm text-white">
+          <CheckCircle2 className="h-4 w-4" />
+          Settings saved.
+        </p>
+      )}
+      {status === "error" && (
+        <p className="mt-3 text-sm text-red-400">{error}</p>
+      )}
     </form>
   );
 }

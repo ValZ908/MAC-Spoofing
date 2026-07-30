@@ -1,19 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   ShieldCheck,
   ShieldAlert,
   ShieldQuestion,
-  Monitor,
+  Wifi,
   Bell,
+  Lock,
   Ban,
-  RefreshCw,
-  ArrowRight,
+  Radio,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Alert, DetectorHeartbeat, Device } from "@/lib/types";
+import type { Alert, DetectorHeartbeat } from "@/lib/types";
 
 type DashboardSnapshot = {
   activeDeviceCount: number;
@@ -25,8 +24,6 @@ type DashboardSnapshot = {
   lastHeartbeat: DetectorHeartbeat | null;
 };
 
-type HourlyPoint = { label: string; count: number };
-
 type Props = {
   initialActiveDeviceCount: number;
   initialTrustedDeviceCount: number;
@@ -35,11 +32,6 @@ type Props = {
   initialBlockedCount: number;
   initialTotalAlertCount: number;
   initialLastHeartbeat: DetectorHeartbeat | null;
-  attentionDevices: Device[];
-  hourlyAlertCounts: HourlyPoint[];
-  uptimeLabel: string;
-  monitoringSinceLabel: string;
-  version: string;
 };
 
 const HEARTBEAT_STALE_MS = 25_000;
@@ -50,127 +42,35 @@ const badgeVariant: Record<Alert["status"], "success" | "danger" | "neutral"> = 
   ignored: "neutral",
 };
 
-/**
- * Alerts don't carry a stored severity in the schema — this derives a
- * reasonable label from the attack type so the table reads like the
- * reference design, without inventing data that isn't tracked.
- */
-function severityFor(attackType: Alert["attack_type"]): {
-  label: "High" | "Medium";
-  variant: "danger" | "warning";
-} {
-  return attackType === "arp_poisoning"
-    ? { label: "High", variant: "danger" }
-    : { label: "Medium", variant: "warning" };
-}
-
-const attackLabel: Record<string, string> = {
-  ip_mac_mismatch: "IP/MAC Mismatch",
-  arp_poisoning: "ARP Spoofing",
-};
-
 function StatCard({
   icon: Icon,
   label,
   value,
-  accentClassName,
-  sublabel,
-  sublabelClassName,
+  tone = "default",
 }: {
   icon: React.ElementType;
   label: string;
   value: number;
-  accentClassName: string;
-  sublabel: string;
-  sublabelClassName?: string;
+  tone?: "default" | "danger" | "success";
 }) {
+  const valueColor =
+    tone === "danger"
+      ? "text-red-400"
+      : tone === "success"
+        ? "text-white"
+        : "text-white";
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <span className={`absolute inset-x-0 top-0 h-0.5 ${accentClassName}`} />
-      <div className="flex items-center gap-2 text-muted-foreground">
+    <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4 sm:p-6">
+      <div className="mb-4 flex items-center gap-2 text-gray-400 sm:mb-6">
         <Icon className="h-4 w-4" />
-        <p className="text-xs font-medium uppercase tracking-wide">{label}</p>
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] sm:text-xs">
+          {label}
+        </h3>
       </div>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">{value}</p>
-      <p className={`mt-1 text-xs font-medium ${sublabelClassName ?? "text-muted-foreground"}`}>
-        {sublabel}
-      </p>
-    </div>
-  );
-}
-
-/** Simple hand-rolled donut chart — no charting library required. */
-function TrustDonut({ trusted, untrusted }: { trusted: number; untrusted: number }) {
-  const total = trusted + untrusted;
-  const radius = 60;
-  const circumference = 2 * Math.PI * radius;
-  const trustedRatio = total > 0 ? trusted / total : 0;
-  const trustedLength = circumference * trustedRatio;
-
-  return (
-    <svg viewBox="0 0 160 160" className="h-40 w-40 shrink-0">
-      <circle cx="80" cy="80" r={radius} fill="none" className="stroke-border" strokeWidth="18" />
-      {total > 0 && (
-        <circle
-          cx="80"
-          cy="80"
-          r={radius}
-          fill="none"
-          className="stroke-emerald-500"
-          strokeWidth="18"
-          strokeLinecap="round"
-          strokeDasharray={`${trustedLength} ${circumference - trustedLength}`}
-          strokeDashoffset={circumference * 0.25}
-          transform="rotate(-90 80 80)"
-        />
-      )}
-      <text x="80" y="76" textAnchor="middle" className="fill-foreground text-2xl font-bold">
-        {total}
-      </text>
-      <text x="80" y="98" textAnchor="middle" className="fill-muted-foreground text-xs">
-        Total
-      </text>
-    </svg>
-  );
-}
-
-/** Simple hand-rolled area chart for hourly alert volume — no charting library required. */
-function AlertsAreaChart({ data }: { data: HourlyPoint[] }) {
-  const width = 600;
-  const height = 160;
-  const max = Math.max(1, ...data.map((d) => d.count));
-  const stepX = data.length > 1 ? width / (data.length - 1) : width;
-
-  const points = data.map((d, i) => ({
-    x: i * stepX,
-    y: height - (d.count / max) * (height - 16) - 8,
-  }));
-
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-  const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
-  const labelIndices = [0, 4, 8, 12, 16, 20, 23].filter((i) => i < data.length);
-
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col justify-between py-1 text-xs text-muted-foreground">
-        <span>{max}</span>
-        <span>{Math.round(max / 2)}</span>
-        <span>0</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-40 w-full">
-          <path d={areaPath} className="fill-emerald-500/10" />
-          <path d={linePath} fill="none" className="stroke-emerald-500" strokeWidth="2" />
-          {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r="2.5" className="fill-emerald-500" />
-          ))}
-        </svg>
-        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-          {labelIndices.map((i) => (
-            <span key={i}>{data[i]?.label}</span>
-          ))}
-        </div>
-      </div>
+      <span className={`text-2xl font-bold tracking-tight sm:text-4xl ${valueColor}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -183,10 +83,6 @@ export function DashboardClient({
   initialBlockedCount,
   initialTotalAlertCount,
   initialLastHeartbeat,
-  attentionDevices,
-  hourlyAlertCounts,
-  uptimeLabel,
-  monitoringSinceLabel,
 }: Props) {
   const [activeDeviceCount, setActiveDeviceCount] = useState(initialActiveDeviceCount);
   const [trustedDeviceCount, setTrustedDeviceCount] = useState(initialTrustedDeviceCount);
@@ -195,30 +91,22 @@ export function DashboardClient({
   const [blockedCount, setBlockedCount] = useState(initialBlockedCount);
   const [totalAlertCount, setTotalAlertCount] = useState(initialTotalAlertCount);
   const [lastHeartbeat, setLastHeartbeat] = useState(initialLastHeartbeat);
-
-  // These two are intentionally `null` until the component mounts on the
-  // client. Computing a real Date()/Date.now() during the initial render
-  // would produce a different value on the server than on the client
-  // (they run a few ms apart), which triggers a React hydration mismatch.
-  // Starting both as `null` guarantees the server-rendered HTML and the
-  // first client render are identical; the real values are filled in a
-  // moment later inside useEffect, safely after hydration.
-  const [now, setNow] = useState<number | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    setNow(Date.now());
     const tick = setInterval(() => setNow(Date.now()), 5_000);
     return () => clearInterval(tick);
   }, []);
 
-  async function refresh() {
-    setIsRefreshing(true);
-    try {
-      const res = await fetch("/api/status", { cache: "no-store" });
-      if (res.ok) {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refresh() {
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
         const data = (await res.json()) as DashboardSnapshot;
+        if (cancelled) return;
         setActiveDeviceCount(data.activeDeviceCount);
         setTrustedDeviceCount(data.trustedDeviceCount);
         setRecentAlerts(data.recentAlerts);
@@ -226,36 +114,34 @@ export function DashboardClient({
         setBlockedCount(data.blockedCount);
         setTotalAlertCount(data.totalAlertCount);
         setLastHeartbeat(data.lastHeartbeat);
-        setLastUpdated(new Date());
+      } catch {
+        // Keep last known snapshot if the server briefly restarts.
       }
-    } catch {
-      // Keep last known snapshot if the server briefly restarts.
-    } finally {
-      setIsRefreshing(false);
     }
-  }
 
-  useEffect(() => {
-    // Also grabs the first real snapshot right after mount.
-    void refresh();
     const interval = setInterval(() => {
       void refresh();
     }, 5_000);
-    return () => clearInterval(interval);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const isDanger = unhandledCount > 0;
   const unknownDeviceCount = Math.max(activeDeviceCount - trustedDeviceCount, 0);
   const trustRatio =
-    activeDeviceCount > 0 ? Math.round((trustedDeviceCount / activeDeviceCount) * 100) : 0;
+    activeDeviceCount > 0
+      ? Math.round((trustedDeviceCount / activeDeviceCount) * 100)
+      : 0;
+  const lastEventAt = recentAlerts[0]?.created_at;
 
-  const secondsSinceHeartbeat =
-    lastHeartbeat && now !== null
-      ? Math.round((now - new Date(lastHeartbeat.last_seen).getTime()) / 1000)
-      : null;
+  const secondsSinceHeartbeat = lastHeartbeat
+    ? Math.round((now - new Date(lastHeartbeat.last_seen).getTime()) / 1000)
+    : null;
   const isDetectorOnline =
     lastHeartbeat !== null &&
-    now !== null &&
     now - new Date(lastHeartbeat.last_seen).getTime() < HEARTBEAT_STALE_MS;
 
   const bannerState: "danger" | "warning" | "secure" = isDanger
@@ -264,263 +150,165 @@ export function DashboardClient({
       ? "secure"
       : "warning";
 
-  const bannerCopy = {
-    danger: {
-      title: "Attack Detected",
-      titleClass: "text-foreground font-bold",
-      subtitle: `${unhandledCount} unhandled alert${unhandledCount === 1 ? "" : "s"} need review`,
-      subtitleClass: "text-foreground",
-      cardClass: "border-foreground bg-foreground/5",
-      accentClass: "bg-foreground",
-      iconClass: "text-foreground",
-      icon: ShieldAlert,
-    },
-    warning: {
-      title: "Monitoring Offline",
-      titleClass: "text-muted-foreground font-bold",
-      subtitle: lastHeartbeat
-        ? `Detector agent hasn't reported in ${secondsSinceHeartbeat ?? "…"}s — network state unknown`
-        : "Detector agent has never reported in — is detector.py running?",
-      subtitleClass: "text-muted-foreground",
-      cardClass: "border-border bg-card",
-      accentClass: "bg-muted-foreground",
-      iconClass: "text-muted-foreground",
-      icon: ShieldQuestion,
-    },
-    secure: {
-      title: "Secure",
-      titleClass: "text-emerald-400",
-      subtitle: "No active threats detected. Your network is being monitored.",
-      subtitleClass: "text-muted-foreground",
-      cardClass: "border-border bg-card",
-      accentClass: "bg-emerald-500",
-      iconClass: "text-emerald-400",
-      icon: ShieldCheck,
-    },
-  }[bannerState];
-
   return (
     <div className="flex flex-col gap-8">
-      {/* Page header */}
-      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+      <div
+        className={`flex flex-col items-start gap-4 rounded-3xl border p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6 ${
+          bannerState === "danger"
+            ? "border-red-700/40 bg-gradient-to-b from-red-700/10 to-red-700/[0.02] shadow-[inset_0_0_50px_rgba(185,28,28,0.05)]"
+            : bannerState === "warning"
+              ? "border-amber-600/40 bg-gradient-to-b from-amber-600/10 to-amber-600/[0.02] shadow-[inset_0_0_50px_rgba(217,119,6,0.05)]"
+              : "border-white/15 bg-gradient-to-b from-white/5 to-white/[0.01] shadow-[inset_0_0_50px_rgba(255,255,255,0.03)]"
+        }`}
+      >
+        <div
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border ${
+            bannerState === "danger"
+              ? "border-red-500/20 bg-red-900/20"
+              : bannerState === "warning"
+                ? "border-amber-500/20 bg-amber-900/20"
+                : "border-white/15 bg-white/5"
+          }`}
+        >
+          {bannerState === "danger" ? (
+            <ShieldAlert className="h-7 w-7 text-red-500" />
+          ) : bannerState === "warning" ? (
+            <ShieldQuestion className="h-7 w-7 text-amber-500" />
+          ) : (
+            <ShieldCheck className="h-7 w-7 text-white" />
+          )}
+        </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Dashboard
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {bannerState === "danger"
+              ? "Attack Detected"
+              : bannerState === "warning"
+                ? "Monitoring Offline"
+                : "Secure"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Overview of your network security status
+          <p
+            className={`text-sm font-medium tracking-wide ${
+              bannerState === "danger"
+                ? "text-red-400"
+                : bannerState === "warning"
+                  ? "text-amber-400"
+                  : "text-gray-400"
+            }`}
+          >
+            {bannerState === "danger" &&
+              `${unhandledCount} unhandled alert${unhandledCount === 1 ? "" : "s"}`}
+            {bannerState === "warning" &&
+              (lastHeartbeat
+                ? `Detector agent hasn't reported in ${secondsSinceHeartbeat}s — network state unknown`
+                : "Detector agent has never reported in — is detector.py running?")}
+            {bannerState === "secure" &&
+              lastEventAt &&
+              `Last event: ${new Date(lastEventAt).toLocaleString("en-US")}`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground sm:self-auto"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString("en-US") : "—"}
-        </button>
       </div>
 
-      {/* Status banner */}
-      <div className={`relative overflow-hidden rounded-2xl border p-5 shadow-sm sm:p-6 ${bannerCopy.cardClass}`}>
-        <span className={`absolute inset-y-0 left-0 w-0.5 ${bannerCopy.accentClass}`} />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <bannerCopy.icon className={`h-5 w-5 shrink-0 ${bannerCopy.iconClass}`} />
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">
-                Network Status: <span className={bannerCopy.titleClass}>{bannerCopy.title}</span>
-              </h2>
-              <p className={`text-sm ${bannerCopy.subtitleClass}`}>{bannerCopy.subtitle}</p>
-            </div>
-          </div>
-          <div className="flex gap-6 sm:gap-8">
-            <div>
-              <p className="text-xs text-muted-foreground">Uptime</p>
-              <p className="text-sm font-semibold text-foreground">{uptimeLabel}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Monitoring Since</p>
-              <p className="text-sm font-semibold text-foreground">{monitoringSinceLabel}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard icon={Wifi} label="Active Devices" value={activeDeviceCount} />
+        <StatCard icon={Lock} label="Trusted Devices" value={trustedDeviceCount} />
         <StatCard
-          icon={Monitor}
-          label="Active Devices"
-          value={activeDeviceCount}
-          accentClassName="bg-border"
-          sublabel="Currently online"
-        />
-        <StatCard
-          icon={ShieldCheck}
-          label="Trusted Devices"
-          value={trustedDeviceCount}
-          accentClassName="bg-emerald-500"
-          sublabel={`${trustRatio}% of active devices`}
-        />
-        <StatCard
-          icon={Bell}
+          icon={ShieldAlert}
           label="Unhandled Alerts"
           value={unhandledCount}
-          accentClassName={unhandledCount > 0 ? "bg-foreground" : "bg-border"}
-          sublabel={unhandledCount > 0 ? "Requires attention" : "All clear"}
-          sublabelClassName={unhandledCount > 0 ? "text-foreground font-semibold" : "text-muted-foreground"}
+          tone={unhandledCount > 0 ? "danger" : "default"}
         />
-        <StatCard
-          icon={Ban}
-          label="Blocked Attacks"
-          value={blockedCount}
-          accentClassName="bg-border"
-          sublabel="Total blocked to date"
-        />
+        <StatCard icon={Ban} label="Blocked Attacks" value={blockedCount} />
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left column */}
-        <div className="flex flex-col gap-6 lg:col-span-8">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-foreground">Recent Alerts</h3>
-              <Link
-                href="/alerts"
-                className="flex items-center gap-1 text-sm font-medium text-emerald-400 hover:text-emerald-300"
-              >
-                View all alerts <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-
-            {recentAlerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No alerts yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr>
-                      <th className="pb-2 font-medium">Time</th>
-                      <th className="pb-2 font-medium">Type</th>
-                      <th className="pb-2 font-medium">Source</th>
-                      <th className="pb-2 font-medium">Severity</th>
-                      <th className="pb-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {recentAlerts.map((alert) => {
-                      const severity = severityFor(alert.attack_type);
-                      return (
-                        <tr key={alert.id}>
-                          <td className="py-2.5 text-foreground">
-                            {new Date(alert.created_at).toLocaleTimeString("en-US")}
-                          </td>
-                          <td className="py-2.5 text-foreground">
-                            {attackLabel[alert.attack_type] ?? alert.attack_type}
-                          </td>
-                          <td className="py-2.5 text-muted-foreground">{alert.target_ip}</td>
-                          <td className="py-2.5">
-                            <Badge variant={severity.variant}>{severity.label}</Badge>
-                          </td>
-                          <td className="py-2.5">
-                            <Badge variant={badgeVariant[alert.status]}>{alert.status}</Badge>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+      <div className="grid grid-cols-1 gap-4 sm:gap-8 lg:grid-cols-12">
+        <div className="flex flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:rounded-[32px] sm:p-10 lg:col-span-7">
+          <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
+            <Bell className="h-5 w-5" />
+            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">
+              Recent Alerts
+            </h3>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-foreground">Alerts (Last 24 Hours)</h3>
-              <span className="text-xs text-muted-foreground">Auto-refreshes with the page</span>
-            </div>
-            <AlertsAreaChart data={hourlyAlertCounts} />
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="flex flex-col gap-6 lg:col-span-4">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-            <h3 className="mb-4 text-sm font-bold text-foreground">Device Trust Summary</h3>
-            {activeDeviceCount === 0 ? (
-              <p className="text-sm text-muted-foreground">No active devices yet.</p>
-            ) : (
-              <div className="flex flex-col items-center gap-4">
-                <TrustDonut trusted={trustedDeviceCount} untrusted={unknownDeviceCount} />
-                <div className="w-full space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-foreground">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      Trusted
-                    </span>
-                    <span className="text-muted-foreground">
-                      {trustedDeviceCount} ({trustRatio}%)
-                    </span>
+          {recentAlerts.length === 0 ? (
+            <p className="text-sm text-slate-500">No alerts yet.</p>
+          ) : (
+            <div className="space-y-3 sm:space-y-4">
+              {recentAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-zinc-800 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+                >
+                  <div className="text-sm font-medium text-gray-300">
+                    {new Date(alert.created_at).toLocaleString("en-US")}
+                    <span className="mx-3 text-gray-500">→</span>
+                    {alert.target_ip}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-foreground">
-                      <span className="h-2.5 w-2.5 rounded-full bg-border" />
-                      Untrusted
-                    </span>
-                    <span className="text-muted-foreground">
-                      {unknownDeviceCount} ({100 - trustRatio}%)
-                    </span>
-                  </div>
+                  <Badge variant={badgeVariant[alert.status]} className="w-fit">
+                    {alert.status}
+                  </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Reflects currently active devices only.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-foreground">Devices Needing Attention</h3>
-              <Link
-                href="/devices"
-                className="flex items-center gap-1 text-sm font-medium text-emerald-400 hover:text-emerald-300"
-              >
-                View all <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              ))}
             </div>
-            {attentionDevices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                All active devices are trusted.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {attentionDevices.map((device) => (
-                  <li
-                    key={device.id}
-                    className="flex items-center justify-between rounded-xl border border-border bg-background p-3 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">
-                        {device.ip_address ?? "Unknown IP"}
-                      </p>
-                      <p className="truncate font-mono text-xs text-muted-foreground">
-                        {device.mac_address}
-                      </p>
-                    </div>
-                    <Badge variant="warning">Untrusted</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          )}
         </div>
-      </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Total alerts logged: {totalAlertCount}</span>
+        <div className="flex min-h-[260px] flex-col rounded-2xl border border-white/10 bg-zinc-800 p-5 sm:min-h-[300px] sm:rounded-[32px] sm:p-10 lg:col-span-5">
+          <div className="mb-6 flex items-center gap-3 text-gray-400 sm:mb-8">
+            <ShieldCheck className="h-5 w-5" />
+            <h3 className="text-sm font-bold uppercase tracking-[0.15em]">
+              Device Trust
+            </h3>
+          </div>
+
+          <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
+            <span className="flex items-center gap-2 text-sm text-gray-400">
+              <Radio className="h-4 w-4" />
+              Detector Agent
+            </span>
+            <Badge variant={isDetectorOnline ? "success" : "danger"}>
+              {isDetectorOnline
+                ? "Online"
+                : lastHeartbeat
+                  ? `Offline (${secondsSinceHeartbeat}s ago)`
+                  : "Never seen"}
+            </Badge>
+          </div>
+
+          {activeDeviceCount === 0 ? (
+            <p className="text-sm text-slate-500">No active devices yet.</p>
+          ) : (
+            <div className="flex flex-1 flex-col justify-center gap-6">
+              <div>
+                <div className="mb-2 flex items-baseline justify-between">
+                  <span className="text-sm text-gray-400">Trusted</span>
+                  <span className="text-sm font-semibold text-white">
+                    {trustedDeviceCount} / {activeDeviceCount}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className="h-full rounded-full bg-white"
+                    style={{ width: `${trustRatio}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
+                <span className="text-sm text-gray-400">Unknown devices</span>
+                <span className="text-sm font-semibold text-white">
+                  {unknownDeviceCount}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-zinc-800 p-4">
+                <span className="text-sm text-gray-400">Total alerts logged</span>
+                <span className="text-sm font-semibold text-gray-300">
+                  {totalAlertCount}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
