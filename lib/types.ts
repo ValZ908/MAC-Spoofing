@@ -45,6 +45,8 @@ export type RouterConfig = {
   spoof_window_seconds: number;
   alert_cooldown_seconds: number;
   min_poisoning_ips: number;
+  detector_auto_start: boolean;
+  detector_iface: string;
 };
 
 export type DetectionSettings = Pick<

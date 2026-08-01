@@ -46,6 +46,8 @@ type RouterConfigRow = {
   spoof_window_seconds: number;
   alert_cooldown_seconds: number;
   min_poisoning_ips: number;
+  detector_auto_start: number;
+  detector_iface: string;
 };
 
 type LockRow = {
@@ -326,6 +328,8 @@ export function getRouterConfig(): RouterConfig {
     ...row,
     alert_cooldown_seconds: row.alert_cooldown_seconds ?? 300,
     min_poisoning_ips: row.min_poisoning_ips ?? 3,
+    detector_auto_start: intToBool(row.detector_auto_start ?? 1),
+    detector_iface: row.detector_iface ?? "",
   };
 }
 
@@ -384,6 +388,8 @@ export function updateRouterConfig(input: {
   spoof_window_seconds: number;
   alert_cooldown_seconds: number;
   min_poisoning_ips: number;
+  detector_auto_start: boolean;
+  detector_iface: string;
 }): void {
   const existing = getRouterConfig();
   getDb()
@@ -391,7 +397,8 @@ export function updateRouterConfig(input: {
       `UPDATE router_config
        SET router_ip = ?, username = ?, password = ?,
            block_command_template = ?, spoof_window_seconds = ?,
-           alert_cooldown_seconds = ?, min_poisoning_ips = ?
+           alert_cooldown_seconds = ?, min_poisoning_ips = ?,
+           detector_auto_start = ?, detector_iface = ?
        WHERE id = ?`
     )
     .run(
@@ -402,6 +409,8 @@ export function updateRouterConfig(input: {
       input.spoof_window_seconds,
       input.alert_cooldown_seconds,
       input.min_poisoning_ips,
+      boolToInt(input.detector_auto_start),
+      input.detector_iface,
       existing.id
     );
 }

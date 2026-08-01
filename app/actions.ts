@@ -112,6 +112,8 @@ export async function saveRouterConfig(
     formData.get("alert_cooldown_seconds") ?? 300
   );
   const min_poisoning_ips = Number(formData.get("min_poisoning_ips") ?? 3);
+  const detector_auto_start = formData.get("detector_auto_start") === "on";
+  const detector_iface = String(formData.get("detector_iface") ?? "");
 
   updateRouterConfig({
     router_ip,
@@ -127,7 +129,14 @@ export async function saveRouterConfig(
     min_poisoning_ips: Number.isFinite(min_poisoning_ips)
       ? min_poisoning_ips
       : 3,
+    detector_auto_start,
+    detector_iface,
   });
+
+  if (detector_auto_start) {
+    const { getDetectorSupervisor } = await import("@/lib/detector/supervisor");
+    getDetectorSupervisor().restart({ iface: detector_iface });
+  }
 
   revalidatePath("/settings");
   return { success: true };

@@ -1,14 +1,14 @@
 """
 Local ARP monitor for MAC spoofing / ARP poisoning.
 
-Talks to the Next.js dashboard over HTTP on localhost — no cloud account
-or .env file required. Start the dashboard first (`npm run dev`), then:
+Started automatically by the Next.js dashboard (Settings → Built-in Detector).
+You can still run it manually if needed:
 
     python detector.py
 
 Optional:
 
-    python detector.py --api http://127.0.0.1:3000
+    python detector.py --api http://127.0.0.1:3000 --iface "\\Device\\NPF_{...}"
 """
 
 from __future__ import annotations
@@ -21,6 +21,11 @@ from datetime import datetime, timezone
 
 import requests
 from scapy.all import ARP, sniff
+
+try:
+    from scapy_iface import resolve_iface
+except ImportError:
+    resolve_iface = None  # type: ignore[misc, assignment]
 
 try:
     from mac_vendor_lookup import MacLookup
@@ -295,6 +300,14 @@ def heartbeat_loop(stop_event: threading.Event) -> None:
         stop_event.wait(HEARTBEAT_INTERVAL_SECONDS)
 
 
+def resolve_sniff_iface(explicit: str | None) -> str | None:
+    if explicit:
+        return explicit
+    if resolve_iface is not None:
+        return resolve_iface()
+    return None
+
+
 def main() -> None:
     global _api_base
 
@@ -306,6 +319,11 @@ def main() -> None:
         default=DEFAULT_API_BASE,
         help=f"Dashboard base URL (default: {DEFAULT_API_BASE})",
     )
+    parser.add_argument(
+        "--iface",
+        default=None,
+        help="Npcap interface name (auto-detected if omitted)",
+    )
     args = parser.parse_args()
     _api_base = args.api
     refresh_detection_config()
@@ -316,6 +334,8 @@ def main() -> None:
     )
     thread.start()
 
+    sniff_iface = resolve_sniff_iface(args.iface)
+
     print(f"[START] Detector talking to {_api_base}")
     print(
         "[INFO] Strict mode: spoof window "
@@ -323,9 +343,22 @@ def main() -> None:
         f"min poisoning IPs {get_min_poisoning_ips(_detection_config)}, "
         f"cooldown {get_alert_cooldown_seconds(_detection_config)}s"
     )
+    if sniff_iface:
+        print(f"[INFO] Sniffing on interface: {sniff_iface}")
+    else:
+        print("[INFO] Sniffing on default interface (auto)")
     print("[INFO] Listening for ARP traffic...")
     try:
-        sniff(filter="arp", prn=process_packet, store=0)
+        if sniff_iface:
+            sniff(
+                filter="arp",
+                prn=process_packet,
+                store=0,
+                iface=sniff_iface,
+                promisc=True,
+            )
+        else:
+            sniff(filter="arp", prn=process_packet, store=0, promisc=True)
     finally:
         stop_event.set()
 
