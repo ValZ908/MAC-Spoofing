@@ -119,13 +119,17 @@ export function DashboardClient({
       }
     }
 
-    const interval = setInterval(() => {
-      void refresh();
-    }, 5_000);
+    const run = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+
+    const interval = setInterval(run, 8_000);
+    document.addEventListener("visibilitychange", run);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", run);
     };
   }, []);
 
@@ -200,7 +204,7 @@ export function DashboardClient({
             {bannerState === "warning" &&
               (lastHeartbeat
                 ? `Detector agent hasn't reported in ${secondsSinceHeartbeat}s — network state unknown`
-                : "Detector agent has never reported in — is detector.py running?")}
+                : "Detector has never reported in — check Settings → Built-in Detector")}
             {bannerState === "secure" &&
               lastEventAt &&
               `Last event: ${new Date(lastEventAt).toLocaleString("en-US")}`}

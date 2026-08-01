@@ -109,6 +109,16 @@ function migrate(db: Database.Database) {
       "ALTER TABLE router_config ADD COLUMN min_poisoning_ips INTEGER NOT NULL DEFAULT 3"
     );
   }
+  if (!names.has("detector_auto_start")) {
+    db.exec(
+      "ALTER TABLE router_config ADD COLUMN detector_auto_start INTEGER NOT NULL DEFAULT 1"
+    );
+  }
+  if (!names.has("detector_iface")) {
+    db.exec(
+      "ALTER TABLE router_config ADD COLUMN detector_iface TEXT NOT NULL DEFAULT ''"
+    );
+  }
 
   const configCount = db
     .prepare("SELECT COUNT(*) AS c FROM router_config")

@@ -11,7 +11,7 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-sm text-gray-400">
-          Configure SSH access to your router so alerts can auto-block attacker MACs.
+          Built-in ARP detector, router SSH blocking, and detection sensitivity.
           Stored locally in SQLite — no cloud account required.
         </p>
       </div>

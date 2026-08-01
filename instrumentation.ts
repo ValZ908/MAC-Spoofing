@@ -4,5 +4,10 @@ export async function register() {
       "@/lib/network/lock-watchdog"
     );
     startAdapterLockWatchdog();
+
+    const { startDetectorSupervisor } = await import(
+      "@/lib/detector/supervisor"
+    );
+    startDetectorSupervisor();
   }
 }

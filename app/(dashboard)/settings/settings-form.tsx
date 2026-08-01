@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Terminal, Timer, CheckCircle2, Save } from "lucide-react";
 import { saveRouterConfig } from "@/app/actions";
 import type { RouterConfig } from "@/lib/types";
+import { DetectorPanel } from "./detector-panel";
 
 function FormField({
   icon: Icon,
@@ -53,10 +54,17 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
   }
 
   return (
-    <form
-      action={handleSubmit}
-      className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8"
-    >
+    <div className="flex flex-col gap-6">
+      <form
+        action={handleSubmit}
+        className="flex flex-col gap-6"
+      >
+        <DetectorPanel
+          initialAutoStart={config?.detector_auto_start ?? true}
+          initialIface={config?.detector_iface ?? ""}
+        />
+
+        <div className="w-full rounded-2xl border border-white/10 bg-zinc-900 p-6 sm:p-8">
       <div className="flex flex-col gap-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Detection Behavior
@@ -137,6 +145,8 @@ export function SettingsForm({ config }: { config: RouterConfig | null }) {
       {status === "error" && (
         <p className="mt-3 text-sm text-red-400">{error}</p>
       )}
-    </form>
+        </div>
+      </form>
+    </div>
   );
 }
