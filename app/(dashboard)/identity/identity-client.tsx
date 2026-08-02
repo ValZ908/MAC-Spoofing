@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   Fingerprint,
   Wifi,
@@ -33,12 +33,6 @@ import {
   unpinGateway,
   clearSecurityLog,
 } from "./actions";
-import {
-  isAdapterUp,
-  isVirtualAdapter,
-  isPhysicalAdapter,
-  sortAdapters,
-} from "@/lib/network/adapter-utils";
 
 type Props = {
   initialLog: MacRotationLogEntry[];
@@ -68,11 +62,8 @@ export function IdentityClient({
   const [rotatingAdapter, setRotatingAdapter] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
   const [rotateError, setRotateError] = useState<string | null>(null);
-  const [statusBanner, setStatusBanner] = useState<{
-    tone: "success" | "error";
-    message: string;
-  } | null>(null);
   const [isClearingLog, setIsClearingLog] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   async function refreshAdapters() {
     const result = await getAdapters();
@@ -152,100 +143,49 @@ export function IdentityClient({
 
   function handleLockToggle(adapter: NetworkAdapter, isLocked: boolean) {
     setLockError(null);
-    setStatusBanner(null);
     setLockingAdapter(adapter.name);
-    void (async () => {
-      try {
-        const result = isLocked
-          ? await unlockAdapter(adapter.name)
-          : await lockAdapter(adapter.name);
-        if (!result.success) {
-          setLockError(result.error);
-          setStatusBanner({ tone: "error", message: result.error });
-        } else {
-          await Promise.all([refreshAdapters(), refreshIdentityData()]);
-          setStatusBanner({
-            tone: "success",
-            message: isLocked
-              ? `Unlocked ${adapter.name}.`
-              : `Locked ${adapter.name} at ${adapter.macAddress}.`,
-          });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setLockError(message);
-        setStatusBanner({ tone: "error", message });
-      } finally {
-        setLockingAdapter(null);
+    startTransition(async () => {
+      const result = isLocked
+        ? await unlockAdapter(adapter.name)
+        : await lockAdapter(adapter.name);
+      if (!result.success) {
+        setLockError(result.error);
+      } else {
+        await Promise.all([refreshAdapters(), refreshIdentityData()]);
       }
-    })();
+      setLockingAdapter(null);
+    });
   }
 
   function handleRotate(adapter: NetworkAdapter) {
-    if (isVirtualAdapter(adapter)) {
-      setStatusBanner({
-        tone: "error",
-        message:
-          "Virtual adapters (以太网 2/3/4, SSTAP, Hyper-V) cannot rotate MAC. Use WLAN or a real Ethernet cable.",
-      });
-      return;
-    }
     setRotateError(null);
-    setStatusBanner(null);
     setRotatingAdapter(adapter.name);
-    void (async () => {
-      try {
-        const result = await rotateAdapterMac(adapter.name);
-        if (!result.success) {
-          setRotateError(result.error);
-          setStatusBanner({ tone: "error", message: result.error });
-        } else {
-          await Promise.all([refreshAdapters(), refreshIdentityData()]);
-          setStatusBanner({
-            tone: "success",
-            message: `Rotated MAC on ${adapter.name}. Adapter may disconnect for ~5s.`,
-          });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setRotateError(message);
-        setStatusBanner({ tone: "error", message });
-      } finally {
-        setRotatingAdapter(null);
+    startTransition(async () => {
+      const result = await rotateAdapterMac(adapter.name);
+      if (!result.success) {
+        setRotateError(result.error);
+      } else {
+        await Promise.all([refreshAdapters(), refreshIdentityData()]);
       }
-    })();
+      setRotatingAdapter(null);
+    });
   }
 
   function handlePinToggle(isLocked: boolean) {
     setPinError(null);
-    setStatusBanner(null);
     setPinningGateway(true);
-    void (async () => {
-      try {
-        const result =
-          isLocked && gatewayInfo
-            ? await unpinGateway(gatewayInfo.ip)
-            : await pinGateway();
-        if (!result.success) {
-          setPinError(result.error);
-          setStatusBanner({ tone: "error", message: result.error });
-        } else {
-          await Promise.all([refreshGatewayInfo(), refreshIdentityData()]);
-          setStatusBanner({
-            tone: "success",
-            message: isLocked
-              ? "Gateway unpinned."
-              : "Gateway MAC pinned successfully.",
-          });
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setPinError(message);
-        setStatusBanner({ tone: "error", message });
-      } finally {
-        setPinningGateway(false);
+    startTransition(async () => {
+      const result =
+        isLocked && gatewayInfo
+          ? await unpinGateway(gatewayInfo.ip)
+          : await pinGateway();
+      if (!result.success) {
+        setPinError(result.error);
+      } else {
+        await Promise.all([refreshGatewayInfo(), refreshIdentityData()]);
       }
-    })();
+      setPinningGateway(false);
+    });
   }
 
   async function handleClearLog() {
@@ -258,8 +198,6 @@ export function IdentityClient({
   }
 
   const lockedCount = locks.filter((l) => l.is_locked).length;
-  const sortedAdapters = sortAdapters(adapters);
-  const hasPhysicalUp = sortedAdapters.some(isPhysicalAdapter);
 
   return (
     <div className="flex flex-col gap-6">
@@ -290,18 +228,6 @@ export function IdentityClient({
         </div>
       </Panel>
 
-      {statusBanner && (
-        <div
-          className={`border px-4 py-3 font-mono text-sm ${
-            statusBanner.tone === "success"
-              ? "border-[hsl(var(--secure)/0.4)] bg-[hsl(var(--secure)/0.08)] text-[hsl(var(--secure))]"
-              : "border-[hsl(var(--danger)/0.4)] bg-[hsl(var(--danger)/0.08)] text-[hsl(var(--danger))]"
-          }`}
-        >
-          {statusBanner.message}
-        </div>
-      )}
-
       {adapterError && (
         <div className="flex items-center gap-2 border border-[hsl(var(--warn)/0.3)] bg-[hsl(var(--warn)/0.08)] px-4 py-3 font-mono text-sm text-[hsl(var(--warn))]">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -321,15 +247,7 @@ export function IdentityClient({
         )}
 
         {gatewayInfoError && !gatewayInfoLoading && (
-          <p className="font-mono text-sm text-[hsl(var(--warn))]">
-            {gatewayInfoError}
-            {!hasPhysicalUp && (
-              <span className="mt-1 block text-[hsl(var(--text-dim))]">
-                Connect to Wi‑Fi (WLAN) or a physical network — virtual-only
-                adapters cannot reach a real gateway.
-              </span>
-            )}
-          </p>
+          <p className="font-mono text-sm text-[hsl(var(--warn))]">{gatewayInfoError}</p>
         )}
 
         {gatewayInfo && !gatewayInfoLoading && (
@@ -357,14 +275,12 @@ export function IdentityClient({
                       via {gatewayInfo.interfaceAlias}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {isPinned && (
-                      <span className="flex items-center gap-1 rounded-sm bg-[hsl(var(--secure)/0.15)] px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-[hsl(var(--secure))]">
-                        <Lock className="h-2.5 w-2.5" />
-                        Pinned
-                      </span>
-                    )}
-                  </div>
+                  {isPinned && (
+                    <span className="flex items-center gap-1 rounded-sm bg-[hsl(var(--secure)/0.15)] px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-[hsl(var(--secure))]">
+                      <Lock className="h-2.5 w-2.5" />
+                      Pinned
+                    </span>
+                  )}
                 </div>
                 <p className="mb-3 font-mono text-xs text-[hsl(var(--text-muted))]">
                   {gatewayInfo.macAddress ?? "unresolved"}
@@ -378,7 +294,11 @@ export function IdentityClient({
                     )}
                 </p>
                 <button
-                  disabled={pinningGateway || (!isPinned && !gatewayInfo.macAddress)}
+                  disabled={
+                    pinningGateway ||
+                    isPending ||
+                    (!isPinned && !gatewayInfo.macAddress)
+                  }
                   onClick={() => handlePinToggle(isPinned)}
                   className={`flex w-full items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 font-mono text-xs font-bold transition disabled:opacity-50 ${
                     isPinned
@@ -424,17 +344,9 @@ export function IdentityClient({
             </button>
           </div>
           <div className="flex flex-col gap-3">
-            {!hasPhysicalUp && !adaptersLoading && sortedAdapters.length > 0 && (
-              <p className="border border-[hsl(var(--warn)/0.3)] bg-[hsl(var(--warn)/0.08)] px-3 py-2 font-mono text-xs text-[hsl(var(--warn))]">
-                Only virtual adapters are Up. Connect <strong>WLAN</strong> or
-                plug in Ethernet to use Rotate / Gateway Protection.
-              </p>
-            )}
-            {sortedAdapters.map((adapter) => {
+            {adapters.map((adapter) => {
               const lock = locks.find((l) => l.adapter_name === adapter.name);
               const isLocked = lock?.is_locked ?? false;
-              const up = isAdapterUp(adapter.status);
-              const virtualNic = isVirtualAdapter(adapter);
 
               return (
                 <div
@@ -461,7 +373,7 @@ export function IdentityClient({
                       )}
                       <span
                         className={`rounded-sm px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
-                          up
+                          adapter.status === "Up"
                             ? "bg-[hsl(var(--surface-3))] text-[hsl(var(--text-muted))]"
                             : "bg-[hsl(var(--surface-3))] text-[hsl(var(--text-dim))]"
                         }`}
@@ -470,50 +382,33 @@ export function IdentityClient({
                       </span>
                     </div>
                   </div>
-                  <p className="mb-1 font-mono text-xs text-[hsl(var(--text-muted))]">
+                  <p className="mb-3 font-mono text-xs text-[hsl(var(--text-muted))]">
                     {adapter.macAddress || "unknown"}
                   </p>
-                  {virtualNic && (
-                    <p className="mb-3 font-mono text-[10px] text-[hsl(var(--text-dim))]">
-                      Virtual adapter — Lock only (Rotate unavailable)
-                    </p>
-                  )}
-                  {!virtualNic && <div className="mb-3" />}
                   <div className="flex gap-2">
-                    {!virtualNic ? (
-                      <button
-                        disabled={
-                          rotatingAdapter === adapter.name ||
-                          isLocked ||
-                          !up
-                        }
-                        onClick={() => handleRotate(adapter)}
-                        title={
-                          !up
-                            ? "Connect this adapter before rotating MAC"
-                            : isLocked
-                              ? "Unlock this adapter first to rotate its MAC"
-                              : undefined
-                        }
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-[hsl(var(--signal))] py-1.5 font-mono text-xs font-bold text-[hsl(var(--primary-foreground))] transition-all hover:tracking-wider hover:brightness-110 disabled:opacity-50"
-                      >
-                        <Shuffle className="h-3.5 w-3.5" />
-                        {rotatingAdapter === adapter.name
-                          ? "Rotating…"
-                          : "Rotate Now"}
-                      </button>
-                    ) : null}
                     <button
-                      disabled={lockingAdapter === adapter.name || !up}
+                      disabled={
+                        rotatingAdapter === adapter.name ||
+                        isLocked ||
+                        isPending
+                      }
+                      onClick={() => handleRotate(adapter)}
                       title={
-                        !up
-                          ? "Connect this adapter before locking"
+                        isLocked
+                          ? "Unlock this adapter first to rotate its MAC"
                           : undefined
                       }
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-[hsl(var(--signal))] py-1.5 font-mono text-xs font-bold text-[hsl(var(--primary-foreground))] transition-all hover:tracking-wider hover:brightness-110 disabled:opacity-50"
+                    >
+                      <Shuffle className="h-3.5 w-3.5" />
+                      {rotatingAdapter === adapter.name
+                        ? "Rotating…"
+                        : "Rotate Now"}
+                    </button>
+                    <button
+                      disabled={lockingAdapter === adapter.name || isPending}
                       onClick={() => handleLockToggle(adapter, isLocked)}
                       className={`flex items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 font-mono text-xs font-bold transition disabled:opacity-50 ${
-                        virtualNic ? "flex-1" : ""
-                      } ${
                         isLocked
                           ? "border border-[hsl(var(--line-strong))] text-[hsl(var(--text-muted))] hover:bg-[hsl(var(--surface-2))]"
                           : "bg-[hsl(var(--secure))] text-[hsl(var(--primary-foreground))] hover:brightness-110"

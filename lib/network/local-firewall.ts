@@ -1,4 +1,4 @@
-import { runPowerShell } from "./windows-adapter";
+import { runPowerShell, escapePowerShellSingleQuoted } from "./windows-adapter";
 
 export type BlockResult = { success: true } | { success: false; error: string };
 
@@ -10,61 +10,11 @@ function isValidIpv4(ip: string): boolean {
   return match.slice(1).every((segment) => Number(segment) <= 255);
 }
 
-function shortenFirewallError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err);
-
-  if (/access is denied|requires elevation|administrator/i.test(raw)) {
-    return "Access denied — run npm run dev as Administrator for real firewall rules.";
-  }
-
-  const stderrIdx = raw.indexOf("stderr:");
-  if (stderrIdx >= 0) {
-    const snippet = raw.slice(stderrIdx + 7).trim().split(/\r?\n/)[0];
-    if (snippet) return snippet.slice(0, 240);
-  }
-
-  if (raw.startsWith("Command failed:")) {
-    return "Windows Firewall command failed.";
-  }
-
-  return raw.slice(0, 240);
-}
-
-function ruleAlreadyExists(message: string): boolean {
-  return /already exists|已存在|duplicate|object already exists/i.test(message);
-}
-
-async function addNetshRule(
-  name: string,
-  direction: "in" | "out",
-  ip: string
-): Promise<BlockResult> {
-  const script =
-    `netsh advfirewall firewall add rule name='${name.replace(/'/g, "''")}' ` +
-    `dir=${direction} action=block remoteip=${ip}`;
-
-  try {
-    await runPowerShell(script, 5_000);
-    return { success: true };
-  } catch (err) {
-    const message = shortenFirewallError(err);
-    if (ruleAlreadyExists(message)) {
-      return { success: true };
-    }
-    return { success: false, error: message };
-  }
-}
-
-async function blockOneIp(ip: string): Promise<BlockResult> {
-  const inResult = await addNetshRule(`MacSpoof-Block-${ip}-In`, "in", ip);
-  if (!inResult.success) return inResult;
-
-  return addNetshRule(`MacSpoof-Block-${ip}-Out`, "out", ip);
-}
-
 /**
- * Block remote IPs on this machine via Windows Firewall (netsh).
- * Each IP is handled in a separate short command to avoid cmdline limits.
+ * Fallback for routers that don't expose SSH (most stock ISP/mesh routers,
+ * e.g. Telkomsel Orbit): instead of blocking the attacker on the router,
+ * block it on this machine via Windows Firewall. Only protects this host,
+ * not the whole network, but works regardless of router make/model.
  */
 export async function blockIpsLocally(ips: string[]): Promise<BlockResult> {
   const validIps = [
@@ -75,12 +25,40 @@ export async function blockIpsLocally(ips: string[]): Promise<BlockResult> {
     return { success: false, error: "No valid IP address to block locally." };
   }
 
-  for (const ip of validIps) {
-    const result = await blockOneIp(ip);
-    if (!result.success) {
-      return result;
-    }
-  }
+  // Two block calls can land for the same IP within milliseconds (a spoof
+  // test/attack typically fires a mismatch alert in each direction). Create
+  // with -ErrorAction Stop inside try/catch and swallow only "already
+  // exists" races, so a concurrent call creating the same rule name doesn't
+  // surface as a false failure — while real errors (e.g. access denied)
+  // still propagate.
+  const script = validIps
+    .map((ip) => {
+      const safeIp = escapePowerShellSingleQuoted(ip);
+      const inName = escapePowerShellSingleQuoted(`MacSpoof-Block-${ip}-In`);
+      const outName = escapePowerShellSingleQuoted(`MacSpoof-Block-${ip}-Out`);
+      return (
+        `if (-not (Get-NetFirewallRule -DisplayName '${inName}' -ErrorAction SilentlyContinue)) { ` +
+        `try { New-NetFirewallRule -DisplayName '${inName}' -Direction Inbound -RemoteAddress '${safeIp}' -Action Block -ErrorAction Stop | Out-Null } ` +
+        `catch { if ($_.Exception.Message -notmatch 'already exists') { throw } } }; ` +
+        `if (-not (Get-NetFirewallRule -DisplayName '${outName}' -ErrorAction SilentlyContinue)) { ` +
+        `try { New-NetFirewallRule -DisplayName '${outName}' -Direction Outbound -RemoteAddress '${safeIp}' -Action Block -ErrorAction Stop | Out-Null } ` +
+        `catch { if ($_.Exception.Message -notmatch 'already exists') { throw } } }`
+      );
+    })
+    .join("; ");
 
-  return { success: true };
+  try {
+    await runPowerShell(script);
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/access is denied|requires elevation|administrator/i.test(message)) {
+      return {
+        success: false,
+        error:
+          "Access denied. Restart the dashboard as Administrator to block locally.",
+      };
+    }
+    return { success: false, error: message };
+  }
 }

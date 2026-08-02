@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { executeAlertBlock } from "@/lib/network/block-alert";
 import { blockMacOnRouter } from "@/lib/router/ssh-block";
+import { blockIpsLocally } from "@/lib/network/local-firewall";
 import {
   getAlertById,
   getDeviceById,
@@ -54,12 +54,36 @@ export async function blockAttacker(alertId: string): Promise<ActionResult> {
     return { success: false, error: "Alert not found." };
   }
 
-  const result = await executeAlertBlock(alert);
-  if (!result.success) {
-    return { success: false, error: result.error };
+  const config = getRouterConfig();
+  let routerError: string | undefined;
+
+  if (config.router_ip) {
+    const result = await blockMacOnRouter(config, alert.attacker_mac);
+    if (result.success) {
+      markAlertBlocked(alertId, "router");
+      revalidatePath("/alerts");
+      revalidatePath("/");
+      return { success: true };
+    }
+    routerError = result.error;
   }
 
-  markAlertBlocked(alertId, result.method);
+  // Router blocking unavailable or failed (e.g. stock ISP/mesh routers like
+  // Telkomsel Orbit don't expose SSH) — fall back to blocking the attacker's
+  // IP locally via Windows Firewall. Only protects this machine, but works
+  // regardless of router make/model.
+  const targetIps = alert.target_ip.split(",").map((ip) => ip.trim());
+  const localResult = await blockIpsLocally(targetIps);
+  if (!localResult.success) {
+    return {
+      success: false,
+      error: routerError
+        ? `Router block failed (${routerError}); local firewall block also failed: ${localResult.error}`
+        : localResult.error,
+    };
+  }
+
+  markAlertBlocked(alertId, "local_firewall");
   revalidatePath("/alerts");
   revalidatePath("/");
   return { success: true };
