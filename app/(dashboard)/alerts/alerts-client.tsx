@@ -16,6 +16,7 @@ function statusLabel(alert: Alert): string {
   if (alert.status === "ignored") return "Ignored";
   if (alert.block_method === "local_firewall") return "Blocked (Local Firewall)";
   if (alert.block_method === "router") return "Blocked (Router)";
+  if (alert.block_method === "dashboard") return "Blocked";
   return "Blocked";
 }
 
@@ -65,22 +66,19 @@ export function AlertsClient({ initialAlerts }: { initialAlerts: Alert[] }) {
   }
 
   function block(alert: Alert) {
-    setAlerts((list) =>
-      list.map((a) =>
-        a.id === alert.id ? { ...a, status: "blocked" as const } : a
-      )
-    );
     setPendingId(alert.id);
-    setErrorById((e) => ({ ...e, [alert.id]: "" }));
+    setErrorById((e) => {
+      const next = { ...e };
+      delete next[alert.id];
+      return next;
+    });
     startTransition(async () => {
       const result = await blockAttacker(alert.id);
       setPendingId(null);
       if (!result.success) {
         setErrorById((e) => ({ ...e, [alert.id]: result.error }));
-        void syncFromApi();
-      } else {
-        void syncFromApi();
       }
+      void syncFromApi();
     });
   }
 

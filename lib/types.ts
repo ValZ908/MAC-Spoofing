@@ -16,7 +16,7 @@ export type AlertStatus = "unhandled" | "blocked" | "ignored";
 
 export type AttackType = "ip_mac_mismatch" | "arp_poisoning";
 
-export type BlockMethod = "router" | "local_firewall";
+export type BlockMethod = "router" | "local_firewall" | "dashboard";
 
 export type Alert = {
   id: string;
@@ -75,6 +75,7 @@ export type NetworkAdapter = {
   description: string;
   macAddress: string;
   status: string;
+  interfaceIndex: number;
 };
 
 export type AdapterLock = {
@@ -98,4 +99,6 @@ export type GatewayInfo = {
   ip: string;
   interfaceAlias: string;
   macAddress: string | null;
+  /** True when live OS lookup failed and demo values are shown instead. */
+  simulated?: boolean;
 };

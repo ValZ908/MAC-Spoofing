@@ -1,6 +1,8 @@
 import {
   runPowerShell,
+  runPowerShellJson,
   escapePowerShellSingleQuoted,
+  utf8ToPowerShellBase64,
 } from "./windows-adapter";
 import type { GatewayInfo } from "@/lib/types";
 
@@ -60,31 +62,47 @@ export async function getDefaultGateway(
     return gatewayCache.data;
   }
 
-  const stdout = await runPowerShell(
-    `$route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | ` +
-      `Sort-Object -Property RouteMetric | Select-Object -First 1 NextHop, InterfaceAlias; ` +
-      `if (-not $route) { '{}'; exit }; ` +
-      `$ip = $route.NextHop; ` +
-      `$mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
-      `Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
-      `Select-Object -First 1 -ExpandProperty LinkLayerAddress); ` +
-      `if (-not $mac) { ` +
-      `Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue | Out-Null; ` +
-      `Start-Sleep -Milliseconds 300; ` +
-      `$mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
-      `Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
-      `Select-Object -First 1 -ExpandProperty LinkLayerAddress) }; ` +
-      `[PSCustomObject]@{ NextHop = $ip; InterfaceAlias = $route.InterfaceAlias; Mac = $mac } | ConvertTo-Json -Compress`,
-    10_000
-  );
-
-  const trimmed = stdout.trim();
-  if (!trimmed) {
+  let result: RawGatewayResult;
+  try {
+    result = await runPowerShellJson<RawGatewayResult>(
+      `$route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | ` +
+        `Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' } | ` +
+        `Sort-Object -Property RouteMetric | Select-Object -First 1 NextHop, InterfaceAlias, InterfaceIndex; ` +
+        `if (-not $route) { ` +
+        `  $cfg = Get-NetIPConfiguration -ErrorAction SilentlyContinue | ` +
+        `    Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter -and $_.NetAdapter.Status -eq 'Up' } | ` +
+        `    Select-Object -First 1; ` +
+        `  if ($cfg) { ` +
+        `    $route = [PSCustomObject]@{ NextHop = $cfg.IPv4DefaultGateway.NextHop; InterfaceAlias = $cfg.InterfaceAlias; InterfaceIndex = $cfg.NetAdapter.InterfaceIndex } ` +
+        `  } ` +
+        `}; ` +
+        `if (-not $route -or -not $route.NextHop) { ` +
+        `  [PSCustomObject]@{ NextHop = ''; InterfaceAlias = ''; Mac = $null } ` +
+        `} else { ` +
+        `  $ip = $route.NextHop; ` +
+        `  $alias = $route.InterfaceAlias; ` +
+        `  if (-not $alias -and $route.InterfaceIndex) { ` +
+        `    $alias = (Get-NetAdapter -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name) ` +
+        `  }; ` +
+        `  $mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
+        `    Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
+        `    Select-Object -First 1 -ExpandProperty LinkLayerAddress); ` +
+        `  if (-not $mac) { ` +
+        `    Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue | Out-Null; ` +
+        `    Start-Sleep -Milliseconds 400; ` +
+        `    $mac = (Get-NetNeighbor -IPAddress $ip -ErrorAction SilentlyContinue | ` +
+        `      Where-Object { $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | ` +
+        `      Select-Object -First 1 -ExpandProperty LinkLayerAddress) ` +
+        `  }; ` +
+        `  [PSCustomObject]@{ NextHop = $ip; InterfaceAlias = $(if ($alias) { $alias } else { '' }); Mac = $mac } ` +
+        `}`,
+      15_000
+    );
+  } catch {
     gatewayCache = { data: null, expiresAt: Date.now() + GATEWAY_CACHE_TTL_MS };
     return null;
   }
 
-  const result: RawGatewayResult = JSON.parse(trimmed);
   if (!result?.NextHop) {
     gatewayCache = { data: null, expiresAt: Date.now() + GATEWAY_CACHE_TTL_MS };
     return null;
@@ -110,13 +128,14 @@ export async function pinGatewayMac(
   ip: string,
   mac: string
 ): Promise<GatewayCommandResult> {
-  const safeIface = escapePowerShellSingleQuoted(interfaceAlias);
+  const ifaceB64 = utf8ToPowerShellBase64(interfaceAlias);
   const safeIp = escapePowerShellSingleQuoted(ip);
   const safeMac = escapePowerShellSingleQuoted(mac.replaceAll(":", "-"));
 
   try {
     await runPowerShell(
-      `netsh interface ipv4 set neighbors '${safeIface}' '${safeIp}' '${safeMac}' store=persistent`
+      `$iface = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${ifaceB64}')); ` +
+        `netsh interface ipv4 set neighbors $iface '${safeIp}' '${safeMac}' store=persistent`
     );
     return { success: true };
   } catch (err) {
@@ -128,12 +147,13 @@ export async function unpinGatewayMac(
   interfaceAlias: string,
   ip: string
 ): Promise<GatewayCommandResult> {
-  const safeIface = escapePowerShellSingleQuoted(interfaceAlias);
+  const ifaceB64 = utf8ToPowerShellBase64(interfaceAlias);
   const safeIp = escapePowerShellSingleQuoted(ip);
 
   try {
     await runPowerShell(
-      `netsh interface ipv4 delete neighbors '${safeIface}' '${safeIp}'`
+      `$iface = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${ifaceB64}')); ` +
+        `netsh interface ipv4 delete neighbors $iface '${safeIp}'`
     );
     return { success: true };
   } catch (err) {

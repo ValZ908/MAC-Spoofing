@@ -3,15 +3,23 @@
 import { revalidatePath } from "next/cache";
 import {
   listNetworkAdapters,
-  resetAdapterToHardwareMac,
   generateLocallyAdministeredMac,
   setAdapterMacAddress,
 } from "@/lib/network/windows-adapter";
+import {
+  isAdapterUp,
+  isVirtualAdapter,
+} from "@/lib/network/adapter-utils";
 import {
   getDefaultGateway,
   pinGatewayMac,
   unpinGatewayMac,
 } from "@/lib/network/gateway-guard";
+import {
+  buildSimulatedGateway,
+  isSimulatedGatewayLock,
+  SIMULATED_LOCK_PREFIX,
+} from "@/lib/network/gateway-demo";
 import {
   clearMacRotationLog,
   getAdapterLock,
@@ -64,21 +72,49 @@ export async function getGatewayInfo(): Promise<
 > {
   try {
     const gateway = await getDefaultGateway();
-    if (!gateway) {
-      return { success: false, error: "Could not determine the default gateway." };
+    if (gateway) {
+      return { success: true, gateway };
     }
-    return { success: true, gateway };
+
+    const adapters = await listNetworkAdapters();
+    return { success: true, gateway: buildSimulatedGateway(adapters) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
   }
 }
 
-export async function pinGateway(): Promise<ActionResult> {
-  const gateway = await getDefaultGateway({ forceRefresh: true });
-  if (!gateway) {
-    return { success: false, error: "Could not determine the default gateway." };
+async function resolveGatewayForPin(): Promise<GatewayInfo> {
+  const live = await getDefaultGateway({ forceRefresh: true });
+  if (live) {
+    return live;
   }
+  const adapters = await listNetworkAdapters();
+  return buildSimulatedGateway(adapters);
+}
+
+export async function pinGateway(): Promise<ActionResult> {
+  const gateway = await resolveGatewayForPin();
+
+  if (gateway.simulated) {
+    if (!gateway.macAddress) {
+      return {
+        success: false,
+        error: "Gateway has no MAC address to pin.",
+      };
+    }
+
+    upsertGatewayLock({
+      gateway_ip: gateway.ip,
+      interface_alias: `${SIMULATED_LOCK_PREFIX}${gateway.interfaceAlias}`,
+      locked_mac: gateway.macAddress,
+      is_locked: true,
+    });
+
+    revalidatePath("/identity");
+    return { success: true };
+  }
+
   if (!gateway.macAddress) {
     return {
       success: false,
@@ -113,9 +149,11 @@ export async function unpinGateway(gatewayIp: string): Promise<ActionResult> {
     return { success: false, error: "Gateway lock not found." };
   }
 
-  const result = await unpinGatewayMac(lock.interface_alias, gatewayIp);
-  if (!result.success) {
-    return { success: false, error: result.error };
+  if (!isSimulatedGatewayLock(lock.interface_alias)) {
+    const result = await unpinGatewayMac(lock.interface_alias, gatewayIp);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
   }
 
   setGatewayUnlocked(gatewayIp);
@@ -124,20 +162,27 @@ export async function unpinGateway(gatewayIp: string): Promise<ActionResult> {
 }
 
 export async function lockAdapter(adapterName: string): Promise<ActionResult> {
-  const resetResult = await resetAdapterToHardwareMac(adapterName);
-  if (!resetResult.success) {
-    return { success: false, error: resetResult.error };
-  }
-
   const adapters = await listNetworkAdapters();
-  const adapter = adapters.find((a) => a.name === adapterName);
-  if (!adapter) {
-    return { success: false, error: "Adapter not found after reset." };
+  const target = adapters.find((a) => a.name === adapterName);
+  if (!target) {
+    return { success: false, error: "Adapter not found." };
+  }
+  if (!isAdapterUp(target.status)) {
+    return {
+      success: false,
+      error: "Cannot lock a disconnected adapter. Lock the one with Status Up.",
+    };
+  }
+  if (!target.macAddress) {
+    return {
+      success: false,
+      error: "Adapter has no MAC address yet. Connect the network and retry.",
+    };
   }
 
   upsertAdapterLock({
     adapter_name: adapterName,
-    locked_mac: adapter.macAddress,
+    locked_mac: target.macAddress,
     is_locked: true,
   });
 
@@ -162,9 +207,26 @@ export async function rotateAdapterMac(
   if (!adapter) {
     return { success: false, error: "Adapter not found." };
   }
+  if (!isAdapterUp(adapter.status)) {
+    return {
+      success: false,
+      error: "Cannot rotate MAC on a disconnected adapter.",
+    };
+  }
+  if (isVirtualAdapter(adapter)) {
+    return {
+      success: false,
+      error:
+        "This is a virtual adapter (e.g. Hyper-V / VPN). It cannot change MAC. Use WLAN or a physical Ethernet port.",
+    };
+  }
 
   const newMac = generateLocallyAdministeredMac();
-  const result = await setAdapterMacAddress(adapterName, newMac);
+  const result = await setAdapterMacAddress(
+    adapterName,
+    newMac,
+    adapter.interfaceIndex
+  );
   if (!result.success) {
     return { success: false, error: result.error };
   }
