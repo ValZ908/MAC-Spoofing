@@ -8,6 +8,7 @@ import {
   resetAdapterToHardwareMac,
 } from "./windows-adapter";
 import { getNeighborState, pinGatewayMac } from "./gateway-guard";
+import { isSimulatedGatewayLock } from "./gateway-demo";
 import type { AdapterLock, GatewayLock } from "@/lib/types";
 
 const CHECK_INTERVAL_MS = 15_000;
@@ -53,7 +54,10 @@ async function checkLockedAdapters() {
       );
 
       const previousMac = adapter.macAddress;
-      const result = await resetAdapterToHardwareMac(lock.adapter_name);
+      const result = await resetAdapterToHardwareMac(
+        lock.adapter_name,
+        adapter.interfaceIndex
+      );
 
       try {
         insertMacRotationLog({
@@ -94,6 +98,10 @@ async function checkGatewayLocks() {
   if (locks.length === 0) return;
 
   for (const lock of locks) {
+    if (isSimulatedGatewayLock(lock.interface_alias)) {
+      continue;
+    }
+
     const neighbor = await getNeighborState(lock.gateway_ip);
 
     if (neighbor.mac === lock.locked_mac) continue;
