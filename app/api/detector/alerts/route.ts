@@ -8,12 +8,28 @@ import type { AttackType } from "@/lib/types";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  let body: {
     attack_type?: string;
     target_ip?: string;
     real_mac?: string;
     attacker_mac?: string;
   };
+
+  try {
+    const raw = await request.text();
+    if (!raw) {
+      return NextResponse.json(
+        { error: "Request body is empty" },
+        { status: 400 }
+      );
+    }
+    body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
 
   if (!body.attack_type || !body.target_ip || !body.real_mac || !body.attacker_mac) {
     return NextResponse.json(
