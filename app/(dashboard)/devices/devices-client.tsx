@@ -71,9 +71,9 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
+    <div className="overflow-x-auto border border-[hsl(var(--line))]">
       <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-zinc-900 text-gray-400">
+        <thead className="border-b border-[hsl(var(--line))] bg-[hsl(var(--surface-1))] font-mono text-[10px] uppercase tracking-[0.15em] text-[hsl(var(--text-dim))]">
           <tr>
             <th className="px-4 py-3 font-medium">IP Address</th>
             <th className="px-4 py-3 font-medium">MAC Address</th>
@@ -83,14 +83,16 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
             <th className="px-4 py-3 font-medium">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/10 bg-zinc-900">
+        <tbody className="divide-y divide-[hsl(var(--line))] bg-[hsl(var(--surface-1))]">
           {devices.map((device) => (
             <tr
               key={device.id}
-              className="text-gray-300 transition hover:bg-white/10"
+              className="text-[hsl(var(--text-muted))] transition-colors hover:bg-[hsl(var(--surface-2))]"
             >
-              <td className="px-4 py-3">{device.ip_address ?? "-"}</td>
-              <td className="px-4 py-3 font-mono text-xs text-gray-400">
+              <td className="px-4 py-3 font-mono text-[hsl(var(--text))]">
+                {device.ip_address ?? "-"}
+              </td>
+              <td className="px-4 py-3 font-mono text-xs text-[hsl(var(--text-muted))]">
                 {device.mac_address}
               </td>
               <td className="px-4 py-3">{device.vendor ?? "-"}</td>
@@ -113,7 +115,7 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
                       <button
                         disabled={pendingId === device.id}
                         onClick={() => trust(device)}
-                        className="inline-flex items-center gap-1 rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-sm bg-[hsl(var(--signal))] px-3 py-1 font-mono text-xs font-medium text-[hsl(var(--primary-foreground))] transition hover:brightness-110 disabled:opacity-50"
                       >
                         <ShieldCheck className="h-3.5 w-3.5" />
                         Trust
@@ -123,7 +125,7 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
                       <button
                         disabled={pendingId === device.id}
                         onClick={() => disconnect(device)}
-                        className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-sm bg-[hsl(var(--danger))] px-3 py-1 font-mono text-xs font-medium text-[hsl(var(--primary-foreground))] transition hover:brightness-110 disabled:opacity-50"
                       >
                         <WifiOff className="h-3.5 w-3.5" />
                         Disconnect
@@ -131,7 +133,7 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
                     )}
                   </div>
                   {errorById[device.id] && (
-                    <span className="text-xs text-red-600">
+                    <span className="font-mono text-xs text-[hsl(var(--danger))]">
                       {errorById[device.id]}
                     </span>
                   )}
@@ -141,7 +143,7 @@ export function DevicesClient({ initialDevices }: { initialDevices: Device[] }) 
           ))}
           {devices.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+              <td colSpan={6} className="px-4 py-6 text-center font-mono text-[hsl(var(--text-dim))]">
                 No devices detected yet.
               </td>
             </tr>

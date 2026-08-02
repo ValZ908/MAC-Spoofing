@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 type BadgeVariant = "success" | "danger" | "neutral" | "warning";
 
 const variantClasses: Record<BadgeVariant, string> = {
-  success: "bg-white/10 text-white ring-white/20",
-  danger: "bg-red-500/10 text-red-400 ring-red-500/20",
-  warning: "bg-amber-500/10 text-amber-400 ring-amber-500/20",
-  neutral: "bg-white/10 text-gray-300 ring-white/20",
+  success: "bg-[hsl(var(--secure)/0.1)] text-[hsl(var(--secure))] ring-[hsl(var(--secure)/0.3)]",
+  danger: "bg-[hsl(var(--danger)/0.1)] text-[hsl(var(--danger))] ring-[hsl(var(--danger)/0.3)]",
+  warning: "bg-[hsl(var(--warn)/0.1)] text-[hsl(var(--warn))] ring-[hsl(var(--warn)/0.3)]",
+  neutral: "bg-[hsl(var(--surface-3))] text-[hsl(var(--text-muted))] ring-[hsl(var(--line-strong))]",
 };
 
 export function Badge({
@@ -21,7 +21,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide ring-1 ring-inset",
         variantClasses[variant],
         className
       )}
