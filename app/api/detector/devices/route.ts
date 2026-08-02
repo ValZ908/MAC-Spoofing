@@ -11,11 +11,27 @@ export const runtime = "nodejs";
 const DEVICE_STALE_SECONDS = 120;
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  let body: {
     mac_address?: string;
     ip_address?: string | null;
     vendor?: string | null;
   };
+
+  try {
+    const raw = await request.text();
+    if (!raw) {
+      return NextResponse.json(
+        { error: "Request body is empty" },
+        { status: 400 }
+      );
+    }
+    body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
 
   if (!body.mac_address) {
     return NextResponse.json(
